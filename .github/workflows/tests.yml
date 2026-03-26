@@ -1,0 +1,43 @@
+name: Unit Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        cli:
+          - { name: futbin,      dir: futbin/agent-harness,      pkg: futbin }
+          - { name: notebooklm,  dir: notebooklm/agent-harness,  pkg: notebooklm }
+          - { name: gh-trending,  dir: gh-trending/agent-harness, pkg: gh_trending }
+          - { name: producthunt, dir: producthunt/agent-harness, pkg: producthunt }
+          - { name: unsplash,    dir: unsplash/agent-harness,    pkg: unsplash }
+          - { name: booking,     dir: booking/agent-harness,     pkg: booking }
+          - { name: stitch,      dir: stitch/agent-harness,      pkg: stitch }
+          - { name: pexels,      dir: pexels/agent-harness,      pkg: pexels }
+          - { name: reddit,      dir: reddit/agent-harness,      pkg: reddit }
+          - { name: gai,         dir: gai/agent-harness,         pkg: gai }
+
+    name: ${{ matrix.cli.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CLI package
+        run: pip install -e ${{ matrix.cli.dir }}
+
+      - name: Install test dependencies
+        run: pip install pytest
+
+      - name: Run unit tests
+        run: python -m pytest ${{ matrix.cli.dir }}/cli_web/${{ matrix.cli.pkg }}/tests/test_core.py -v

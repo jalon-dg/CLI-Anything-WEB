@@ -1,0 +1,91 @@
+"""Shared CLI helpers for cli-web-reddit."""
+
+from __future__ import annotations
+
+import json
+import sys
+from contextlib import contextmanager
+
+import click
+
+from ..core.exceptions import (
+    AuthError,
+    NetworkError,
+    NotFoundError,
+    RateLimitError,
+    RedditError,
+    ServerError,
+)
+
+
+def resolve_json_mode(json_mode: bool) -> bool:
+    """Honor explicit --json or inherit it from the root CLI context."""
+    if json_mode:
+        return True
+    ctx = click.get_current_context(silent=True)
+    root = ctx.find_root() if ctx else None
+    if root and isinstance(root.obj, dict):
+        return bool(root.obj.get("json", False))
+    return False
+
+
+def json_error(code: str, message: str, **extra) -> str:
+    """Format an error as JSON string."""
+    return json.dumps({"error": True, "code": code, "message": message, **extra})
+
+
+@contextmanager
+def handle_errors(json_mode: bool = False):
+    """Context manager for consistent error handling across all commands."""
+    try:
+        yield
+    except AuthError as exc:
+        if json_mode:
+            click.echo(json_error("AUTH_EXPIRED", str(exc)))
+        else:
+            click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    except NotFoundError as exc:
+        if json_mode:
+            click.echo(json_error("NOT_FOUND", str(exc)))
+        else:
+            click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    except RateLimitError as exc:
+        if json_mode:
+            click.echo(json_error("RATE_LIMITED", str(exc), retry_after=exc.retry_after))
+        else:
+            click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    except ServerError as exc:
+        if json_mode:
+            click.echo(json_error("SERVER_ERROR", str(exc)))
+        else:
+            click.echo(f"Error: {exc}", err=True)
+        sys.exit(2)
+    except NetworkError as exc:
+        if json_mode:
+            click.echo(json_error("NETWORK_ERROR", str(exc)))
+        else:
+            click.echo(f"Error: {exc}", err=True)
+        sys.exit(2)
+    except RedditError as exc:
+        if json_mode:
+            click.echo(json_error("ERROR", str(exc)))
+        else:
+            click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.exit(130)
+
+
+def print_json(data) -> None:
+    """Print data as formatted JSON."""
+    click.echo(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def truncate(text: str | None, length: int = 50) -> str:
+    """Truncate text to a maximum length."""
+    if not text:
+        return ""
+    return text[:length] + "..." if len(text) > length else text

@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "cli-anything-web": {
+      "source": {
+        "source": "github",
+        "repo": "ItamarZand88/CLI-Anything-WEB"
+      }
+    }
+  }
+}

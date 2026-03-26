@@ -1,0 +1,105 @@
+{
+  "version": "1.0.0",
+  "clis": [
+    {
+      "name": "cli-web-futbin",
+      "website": "futbin.com",
+      "protocol": "HTML + JSON API",
+      "auth": "none",
+      "directory": "futbin/agent-harness",
+      "namespace": "cli_web.futbin",
+      "commands": ["players search", "players get", "players compare"],
+      "install": "pip install -e futbin/agent-harness"
+    },
+    {
+      "name": "cli-web-notebooklm",
+      "website": "notebooklm.google.com",
+      "protocol": "batchexecute RPC",
+      "auth": "google_sso",
+      "directory": "notebooklm/agent-harness",
+      "namespace": "cli_web.notebooklm",
+      "commands": ["notebooks list", "notebooks create", "sources add", "chat ask", "artifacts generate"],
+      "install": "pip install -e notebooklm/agent-harness"
+    },
+    {
+      "name": "cli-web-gh-trending",
+      "website": "github.com/trending",
+      "protocol": "HTML scraping",
+      "auth": "none",
+      "directory": "gh-trending/agent-harness",
+      "namespace": "cli_web.gh_trending",
+      "commands": ["repos list", "developers list"],
+      "install": "pip install -e gh-trending/agent-harness"
+    },
+    {
+      "name": "cli-web-producthunt",
+      "website": "producthunt.com",
+      "protocol": "HTML scraping (curl_cffi)",
+      "auth": "none",
+      "directory": "producthunt/agent-harness",
+      "namespace": "cli_web.producthunt",
+      "commands": ["posts list", "posts get"],
+      "install": "pip install -e producthunt/agent-harness"
+    },
+    {
+      "name": "cli-web-unsplash",
+      "website": "unsplash.com",
+      "protocol": "REST API (curl_cffi)",
+      "auth": "none",
+      "directory": "unsplash/agent-harness",
+      "namespace": "cli_web.unsplash",
+      "commands": ["photos search", "photos get", "photos download", "topics list"],
+      "install": "pip install -e unsplash/agent-harness"
+    },
+    {
+      "name": "cli-web-booking",
+      "website": "booking.com",
+      "protocol": "GraphQL + HTML (curl_cffi)",
+      "auth": "waf_cookies",
+      "directory": "booking/agent-harness",
+      "namespace": "cli_web.booking",
+      "commands": ["search find", "property get", "destinations resolve"],
+      "install": "pip install -e booking/agent-harness"
+    },
+    {
+      "name": "cli-web-stitch",
+      "website": "stitch.withgoogle.com",
+      "protocol": "batchexecute RPC",
+      "auth": "google_sso",
+      "directory": "stitch/agent-harness",
+      "namespace": "cli_web.stitch",
+      "commands": ["projects list", "projects create", "projects rename", "projects duplicate", "projects delete", "projects download", "screens list", "screens get", "screens download", "design generate", "design theme", "design history"],
+      "install": "pip install -e stitch/agent-harness"
+    },
+    {
+      "name": "cli-web-pexels",
+      "website": "pexels.com",
+      "protocol": "SSR + __NEXT_DATA__ (curl_cffi)",
+      "auth": "none",
+      "directory": "pexels/agent-harness",
+      "namespace": "cli_web.pexels",
+      "commands": ["photos search", "photos get", "photos download", "videos search", "videos get", "videos download", "users get", "users media", "collections get", "collections discover"],
+      "install": "pip install -e pexels/agent-harness"
+    },
+    {
+      "name": "cli-web-reddit",
+      "website": "reddit.com",
+      "protocol": "REST JSON API (curl_cffi)",
+      "auth": "optional (OAuth via token_v2)",
+      "directory": "reddit/agent-harness",
+      "namespace": "cli_web.reddit",
+      "commands": ["feed hot", "feed new", "feed top", "feed rising", "feed popular", "sub hot", "sub new", "sub top", "sub info", "sub rules", "sub search", "sub join", "sub leave", "search posts", "search subs", "user info", "user posts", "user comments", "post get", "auth login", "auth logout", "auth status", "me profile", "me saved", "me upvoted", "me subscriptions", "me inbox", "vote up", "vote down", "vote unvote", "submit text", "submit link", "comment add", "comment edit", "comment delete", "saved save", "saved unsave"],
+      "install": "pip install -e reddit/agent-harness"
+    },
+    {
+      "name": "cli-web-gai",
+      "website": "google.com/search (AI Mode)",
+      "protocol": "Browser-rendered (Playwright)",
+      "auth": "none",
+      "directory": "gai/agent-harness",
+      "namespace": "cli_web.gai",
+      "commands": ["search ask", "search followup"],
+      "install": "pip install -e gai/agent-harness"
+    }
+  ]
+}

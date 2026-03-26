@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Playwright CLI artifacts
+.playwright-cli/
+
+# Environment / secrets
+.env
+.env.*
+*.credentials.json
+**/auth.json
+**/traffic-capture/
+**/playwright-state.json
+
+# Claude Code local state (settings.json is committed)
+.claude/*.local.md
+.claude/*.local.json
+.claude/logs/
+.claude/hooks/
+
+# Pipeline state
+**/phase-state.json

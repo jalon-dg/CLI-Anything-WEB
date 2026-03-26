@@ -1,0 +1,38 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: Feature type
+      options:
+        - New CLI request (generate a CLI for a new website)
+        - New command for existing CLI
+        - Plugin improvement
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      placeholder: Describe the feature you'd like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      placeholder: Why do you need this? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      placeholder: Links, screenshots, or other relevant information.
