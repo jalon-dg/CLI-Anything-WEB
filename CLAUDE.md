@@ -148,6 +148,7 @@ Sites protected by AWS WAF return a 202 JavaScript challenge page to raw HTTP cl
 | `cli-web-producthunt` | `producthunt/` | HTML scraping (curl_cffi) | Cloudflare bypass |
 | `cli-web-futbin` | `futbin/` | HTML + JSON API | HTML scraping with httpx |
 | `cli-web-gh-trending` | `gh-trending/` | HTML scraping | Simple SSR, no auth |
+| `cli-web-youtube` | `youtube/` | InnerTube REST API (httpx) | Internal POST API, no auth, search/video/channel |
 
 ## Reference Examples
 
