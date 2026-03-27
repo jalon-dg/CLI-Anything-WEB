@@ -104,6 +104,8 @@ def submit_text(subreddit, title, body, flair_id, use_json):
     Example with flair: submit text ClaudeCode "Title" "Body" --flair abc123
     """
     use_json = resolve_json_mode(use_json)
+    # Decode escape sequences so \n from CLI becomes actual newlines
+    body = body.encode("utf-8").decode("unicode_escape") if "\\n" in body else body
     with handle_errors(json_mode=use_json):
         client = RedditClient()
         result = client.submit_text(subreddit, title, body, flair_id=flair_id)
@@ -170,6 +172,8 @@ def add_comment(thing_id, text, use_json):
     thing_id: fullname of the post (t3_xxx) or comment (t1_xxx) to reply to.
     """
     use_json = resolve_json_mode(use_json)
+    # Decode escape sequences so \n from CLI becomes actual newlines
+    text = text.encode("utf-8").decode("unicode_escape") if "\\n" in text else text
     with handle_errors(json_mode=use_json):
         client = RedditClient()
         result = client.comment(thing_id, text)
