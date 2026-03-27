@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0](https://github.com/ItamarZand88/CLI-Anything-WEB/compare/v0.1.0...v0.2.0) (2026-03-27)
+
+
+### Features
+
+* add cli-web-hackernews — browse, search, and interact with Hacker News ([7dcd17a](https://github.com/ItamarZand88/CLI-Anything-WEB/commit/7dcd17aa8625d2dec503ac604d64e87d177cd07d))
+* add cli-web-youtube — search, video details, trending, channels ([9ee1f63](https://github.com/ItamarZand88/CLI-Anything-WEB/commit/9ee1f637d10451074b363ca1af1aeb6781af1851))
+
 ## [Unreleased]
 
 ### Added
