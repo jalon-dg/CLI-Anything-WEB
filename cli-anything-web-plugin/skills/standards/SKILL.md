@@ -51,8 +51,14 @@ Mark inapplicable checks as "N/A — [reason]" rather than creating dead-code st
 Before checking structure or publishing, verify the code *actually does the
 right thing*. Tests prove it runs; this step proves it's correct.
 
-Dispatch 3 agents in the **same message** using the Agent tool. Read the
-complete agent prompts from `references/review-agents.md`.
+Dispatch 3 plugin agents in the **same message** using the Agent tool:
+- `traffic-fidelity-reviewer` — API coverage (reads <APP>.md + client.py + commands/)
+- `harness-compliance-reviewer` — Code conventions (reads HARNESS.md + all source)
+- `output-ux-reviewer` — User experience (runs --help, checks REPL, validates JSON)
+
+Pass each agent: APP_PATH=`{app}/agent-harness`, APP_NAME=`{app}`, and site
+profile (auth_type, is_read_only). The agents are defined in the plugin's
+`agents/` directory.
 
 | Agent | Focus | What it reads | What it catches |
 |-------|-------|---------------|-----------------|
