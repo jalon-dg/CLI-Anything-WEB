@@ -166,6 +166,15 @@ See HARNESS.md "Generated CLI Structure" for the complete package template.
 Key points: `cli_web/` namespace (NO `__init__.py`), `<app>/` sub-package (HAS `__init__.py`),
 `core/`, `commands/`, `utils/`, `tests/` directories.
 
+### Step B.0: Scaffold Core Modules
+
+Before writing implementation code, read `${CLAUDE_PLUGIN_ROOT}/skills/boilerplate/SKILL.md`
+and follow its instructions to scaffold the core/ modules. This generates exceptions.py,
+client.py skeleton, helpers.py, config.py, and (for batchexecute) the rpc/ subpackage.
+
+After scaffolding, review the generated files and customize `client.py` with actual
+endpoint methods from `<APP>.md`.
+
 ### Implementation Rules
 
 - **`exceptions.py`** -- implement first. Required types: AppError (base), AuthError(recoverable), RateLimitError(retry_after), NetworkError, ServerError(status_code), NotFoundError. See `references/exception-hierarchy-example.py` for the complete template.
