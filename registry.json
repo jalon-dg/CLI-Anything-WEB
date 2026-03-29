@@ -100,6 +100,16 @@
       "namespace": "cli_web.gai",
       "commands": ["search ask", "search followup"],
       "install": "pip install -e gai/agent-harness"
+    },
+    {
+      "name": "cli-web-codewiki",
+      "website": "codewiki.google",
+      "protocol": "batchexecute RPC",
+      "auth": "none",
+      "directory": "codewiki/agent-harness",
+      "namespace": "cli_web.codewiki",
+      "commands": ["repos featured", "repos search", "wiki get", "wiki sections", "wiki section", "chat ask"],
+      "install": "pip install -e codewiki/agent-harness"
     }
   ]
 }
