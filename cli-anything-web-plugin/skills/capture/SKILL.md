@@ -41,6 +41,17 @@ Do NOT start unless:
 - [ ] playwright-cli is available (`npx @playwright/cli@latest --version`)
 - [ ] Target URL is known
 
+**Default capture method:** playwright-cli tracing (standard workflow below).
+
+**Optional `--mitmproxy` mode:** If the user passed `--mitmproxy` flag to `/cli-anything-web`, use `mitmproxy-capture.py` instead — it provides no body truncation, real-time noise filtering, deduplication, and enhanced metadata (timestamps, cookies, body sizes). Requires `pip install mitmproxy` (Python 3.12+):
+```
+python ${CLAUDE_PLUGIN_ROOT}/scripts/mitmproxy-capture.py start-proxy --port 8080
+npx @playwright/cli@latest open <url> --config=.playwright/cli.proxy.config.json --headed
+# ... browse the site as normal (snapshot, click, fill, goto) ...
+npx @playwright/cli@latest -s=<app> close
+python ${CLAUDE_PLUGIN_ROOT}/scripts/mitmproxy-capture.py stop-proxy --port 8080 -o <app>/traffic-capture/raw-traffic.json
+```
+
 If playwright-cli fails, fall back to chrome-devtools-mcp (see HARNESS.md Tool Hierarchy).
 
 ### Public API Shortcut
@@ -89,6 +100,14 @@ npx @playwright/cli@latest -s=<app> open <url> --headed --persistent
 # RE-ATTACHED to the existing browser, NOT that a new session was created.
 # Do NOT re-navigate or restart when you see this. The session is still open.
 ```
+
+> **If `--mitmproxy` mode:** Replace the `open` command above with:
+> ```bash
+> python ${CLAUDE_PLUGIN_ROOT}/scripts/mitmproxy-capture.py start-proxy --port 8080
+> npx @playwright/cli@latest -s=<app> open <url> --config=.playwright/cli.proxy.config.json --headed
+> ```
+> This starts the proxy first, then opens the browser routed through it.
+> All subsequent `snapshot`, `click`, `fill`, `goto` commands work exactly the same.
 
 **Do NOT ask the user to log in yet** — Step 2 will determine if auth is needed.
 
@@ -250,6 +269,11 @@ npx @playwright/cli@latest -s=<app> tracing-start
 
 ```
 
+> **If `--mitmproxy` mode:** Skip `tracing-start` and HAR recording above.
+> mitmproxy is already capturing all traffic since Step 1 — just proceed
+> to the exploration below. Every click, navigation, and form submission
+> is automatically recorded by the proxy.
+
 > **HAR recording is optional but recommended.** It produces a standard HAR file
 > alongside the trace. This enables `mitmproxy2swagger` to auto-generate an
 > OpenAPI spec: `pip install mitmproxy2swagger && mitmproxy2swagger -i capture.har -o api-spec.yaml -p <base-url>`
@@ -355,6 +379,21 @@ python ${CLAUDE_PLUGIN_ROOT}/scripts/analyze-traffic.py \
   <app>/traffic-capture/raw-traffic.json --summary
 ```
 
+> **If `--mitmproxy` mode:** Replace everything above with:
+> ```bash
+> # Stop the proxy and save captured traffic (includes auto-analysis)
+> python ${CLAUDE_PLUGIN_ROOT}/scripts/mitmproxy-capture.py stop-proxy \
+>   --port 8080 -o <app>/traffic-capture/raw-traffic.json
+>
+> # The stop-proxy command writes raw-traffic.json directly.
+> # Then run the analyzer for the full report:
+> python ${CLAUDE_PLUGIN_ROOT}/scripts/analyze-traffic.py \
+>   <app>/traffic-capture/raw-traffic.json --summary
+> ```
+> No `tracing-stop` or `parse-trace.py` needed — mitmproxy already has the data.
+> The analysis will include enhanced fields (request_sequence, session_lifecycle,
+> endpoint_sizes) that are only available with mitmproxy capture.
+
 ---
 
 ## Step 5: Close
@@ -377,8 +416,7 @@ Don't grep JS bundles. Start a new trace → screenshot → click the button →
 
 ## Fallback
 
-**Fallback:** If playwright-cli is not available, see HARNESS.md Tool Hierarchy
-for chrome-devtools-mcp fallback instructions.
+**Fallback:** If playwright-cli is not available, see HARNESS.md Tool Hierarchy for chrome-devtools-mcp fallback instructions.
 
 ---
 

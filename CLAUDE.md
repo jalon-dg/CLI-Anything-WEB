@@ -14,7 +14,7 @@ cli-anything-web-plugin/          # The plugin itself
 ├── HARNESS.md                    # Core methodology SOP (read this first)
 ├── commands/                     # Slash commands (/cli-anything-web, /record, /refine, etc.)
 ├── skills/                       # 4-phase skill system (capture → methodology → testing → standards)
-└── scripts/                      # parse-trace.py, analyze-traffic.py, site-fingerprint.js, capture-checkpoint.py, phase-state.py, repl_skin.py
+└── scripts/                      # parse-trace.py, mitmproxy-capture.py, analyze-traffic.py (v1.3.0), site-fingerprint.js, capture-checkpoint.py, phase-state.py, repl_skin.py
 ```
 
 Generated CLIs live in their own directories (e.g., `futbin/agent-harness/`) with namespace packages under `cli_web/`.
@@ -40,7 +40,8 @@ Not all sites need the same pipeline path. Identify the profile early:
 
 ## Tool Hierarchy (Strict)
 
-1. **PRIMARY (traffic capture)**: `npx @playwright/cli@latest` — handles traffic recording during Phase 1
+1. **PRIMARY (traffic capture)**: `npx @playwright/cli@latest` — handles traffic recording during Phase 1 via tracing.
+1b. **OPTIONAL (traffic capture)**: `mitmproxy-capture.py` — proxy-based capture with no body truncation, real-time filtering, enhanced metadata. Activated with `--mitmproxy` flag on `/cli-anything-web`. Requires `pip install mitmproxy` (Python 3.12+).
 2. **PRIMARY (auth login)**: Python `sync_playwright()` — handles browser-based auth login in generated CLIs
 3. **FALLBACK**: `mcp__chrome-devtools__*` — only if playwright unavailable
 4. **NEVER**: `mcp__claude-in-chrome__*` — cannot capture request bodies

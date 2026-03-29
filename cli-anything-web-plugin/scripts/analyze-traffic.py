@@ -12,6 +12,9 @@ Reads the output of parse-trace.py and auto-detects:
 - WebSocket library/sub-protocol fingerprinting
 - Read vs write operation breakdown
 - Suggested CLI command structure
+- Request sequence & auth flow detection (via timestamps)
+- Session/cookie lifecycle analysis (via request_cookies/response_cookies)
+- Endpoint size classification (via response_body_size)
 
 The agent reads this analysis to accelerate Phase 2 (methodology).
 Anything the script can't confidently detect is marked "unknown" —
@@ -29,6 +32,19 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs, unquote
+
+
+def _normalize_headers(headers) -> dict:
+    """Normalize headers to dict format.
+
+    Playwright traces may use [{name, value}] arrays while mitmproxy uses
+    flat dicts. This function accepts both and returns a flat dict.
+    """
+    if isinstance(headers, dict):
+        return headers
+    if isinstance(headers, list):
+        return {h.get("name", ""): h.get("value", "") for h in headers if isinstance(h, dict)}
+    return {}
 
 
 def _is_noise_url(url: str) -> bool:
@@ -135,8 +151,8 @@ def detect_protocol(entries: list[dict]) -> dict:
         method = e.get("method", "GET")
         mime = e.get("mime_type", "")
         body = e.get("post_data", "") or ""
-        headers = e.get("request_headers", {})
-        resp_headers = e.get("response_headers", {})
+        headers = _normalize_headers(e.get("request_headers", {}))
+        resp_headers = _normalize_headers(e.get("response_headers", {}))
         content_type = headers.get("content-type", headers.get("Content-Type", ""))
 
         # Skip noise for protocol detection (analytics, tracking, CDN)
@@ -287,8 +303,16 @@ def detect_protocol(entries: list[dict]) -> dict:
             parsed = urlparse(url)
             firebase_paths.append(parsed.path)
 
-        # --- REST --- resource-style URLs
-        if not is_noise and (re.match(r".*/api/v\d+/", url) or "/api/" in url):
+        # --- REST --- resource-style URLs or JSON responses to GET/POST
+        is_rest_candidate = False
+        if not is_noise:
+            # Explicit /api/ prefix (strong signal)
+            if re.match(r".*/api/v\d+/", url) or "/api/" in url:
+                is_rest_candidate = True
+            # JSON response to a non-noise request without matching another protocol
+            elif mime and "json" in mime.lower() and method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+                is_rest_candidate = True
+        if is_rest_candidate:
             # Don't count if already matched a specific protocol above
             if signals["graphql"] == 0 and signals["trpc"] == 0:
                 signals["rest"] += 2
@@ -376,7 +400,7 @@ def detect_auth(entries: list[dict]) -> dict:
     cookie_names = set()
 
     for e in (e for e in entries if not _is_noise_url(e.get("url", ""))):
-        headers = e.get("request_headers", {})
+        headers = _normalize_headers(e.get("request_headers", {}))
         has_auth = False
 
         # Bearer token
@@ -464,8 +488,8 @@ def detect_protections(entries: list[dict]) -> dict:
 
     for e in entries:
         status = e.get("status", 0)
-        req_headers = e.get("request_headers", {})
-        headers = e.get("response_headers", {})
+        req_headers = _normalize_headers(e.get("request_headers", {}))
+        headers = _normalize_headers(e.get("response_headers", {}))
         body = e.get("response_body", "")
         body_str = str(body)[:2000].lower() if body else ""
         cookie = req_headers.get("cookie", req_headers.get("Cookie", ""))
@@ -676,7 +700,7 @@ def detect_rate_limits(entries: list[dict]) -> dict:
 
     for e in entries:
         status = e.get("status", 0)
-        headers = e.get("response_headers", {})
+        headers = _normalize_headers(e.get("response_headers", {}))
 
         if status == 429:
             status_429_count += 1
@@ -786,6 +810,295 @@ def suggest_commands(endpoint_groups: list[dict], protocol: dict) -> list[dict]:
     return suggestions
 
 
+_AUTH_ENDPOINT_PATTERNS = re.compile(
+    r'/(login|auth|oauth|token|signin|sign-in|sso|callback|authorize)', re.I
+)
+_AUTH_COOKIE_NAMES = re.compile(
+    r'(session|auth|token|sid|jwt|access|refresh|id_token|csrftoken|_csrf)', re.I
+)
+
+
+def detect_request_sequence(entries: list[dict]) -> dict:
+    """Use timestamp field to detect auth flows, redirect chains, and request ordering."""
+    # Check if timestamps are available and numeric
+    def _ts(e: dict) -> float | None:
+        v = e.get("timestamp")
+        if isinstance(v, (int, float)):
+            return float(v)
+        return None
+
+    has_timestamps = any(_ts(e) is not None for e in entries)
+    if not has_timestamps:
+        return {"has_timestamps": False}
+
+    # Sort entries by timestamp (only entries with valid numeric timestamps)
+    timed = [e for e in entries if _ts(e) is not None]
+    timed.sort(key=lambda e: _ts(e) or 0)
+
+    # --- Request timeline (first 20) ---
+    timeline = []
+    prev_ts = _ts(timed[0]) or 0 if timed else 0
+    for i, e in enumerate(timed[:20]):
+        ts = _ts(e) or 0
+        delta_ms = round((ts - prev_ts) * 1000, 1) if i > 0 else 0
+        url = e.get("url", "")
+        timeline.append({
+            "seq": i + 1,
+            "method": e.get("method", "GET"),
+            "url": url[:80],
+            "status": e.get("status", 0),
+            "delta_ms": delta_ms,
+        })
+        prev_ts = ts
+
+    # --- Auth flow detection ---
+    auth_flow = {"detected": False, "steps": []}
+    # Track which cookies are set by responses
+    session_cookies_set = {}  # cookie_name -> seq number where it was set
+
+    for i, e in enumerate(timed):
+        seq = i + 1
+        url = e.get("url", "")
+        method = e.get("method", "GET")
+        status = e.get("status", 0)
+        resp_cookies = e.get("response_cookies", []) or []
+
+        # Check if this is a login/auth request
+        is_auth_endpoint = bool(_AUTH_ENDPOINT_PATTERNS.search(url))
+        is_auth_post = is_auth_endpoint and method == "POST"
+
+        # Check if response sets auth cookies
+        auth_cookies_set = []
+        for rc in resp_cookies:
+            name = rc.get("name", "") if isinstance(rc, dict) else ""
+            if _AUTH_COOKIE_NAMES.search(name):
+                auth_cookies_set.append(name)
+                session_cookies_set[name] = seq
+
+        if is_auth_post or (auth_cookies_set and is_auth_endpoint):
+            auth_flow["detected"] = True
+            auth_flow["steps"].append({
+                "seq": seq,
+                "action": "login",
+                "url": url[:80],
+                "cookies_set": auth_cookies_set if auth_cookies_set else [],
+            })
+        elif session_cookies_set:
+            # Check if this request uses cookies that were set by an auth step
+            req_cookies = e.get("request_cookies", {}) or {}
+            used = [name for name in req_cookies if name in session_cookies_set]
+            if used and not _is_noise_url(url):
+                auth_flow["steps"].append({
+                    "seq": seq,
+                    "action": "api_call",
+                    "url": url[:80],
+                    "cookies_used": used,
+                })
+                # Only keep first 10 api_call steps to avoid huge output
+                if len(auth_flow["steps"]) > 15:
+                    break
+
+    # --- Redirect chains (follow Location headers, not array adjacency) ---
+    redirect_chains = []
+    # Build a map of URL → entry for redirect target matching
+    url_to_entry = {}
+    for e in timed:
+        url_to_entry.setdefault(e.get("url", ""), e)
+
+    visited_redirects: set[str] = set()
+    for e in timed:
+        url = e.get("url", "")
+        status = e.get("status", 0)
+        if status not in (301, 302, 303, 307, 308):
+            continue
+        if url in visited_redirects:
+            continue
+
+        # Follow the chain via Location headers
+        chain_start = url
+        chain_hops = 0
+        location = ""
+        current = e
+        while current:
+            current_url = current.get("url", "")
+            current_status = current.get("status", 0)
+            if current_status not in (301, 302, 303, 307, 308):
+                break
+            visited_redirects.add(current_url)
+            chain_hops += 1
+            resp_headers = _normalize_headers(current.get("response_headers", {}))
+            location = resp_headers.get("location", resp_headers.get("Location", ""))
+            if not location:
+                break
+            # Resolve relative Location
+            if location.startswith("/"):
+                parsed_curr = urlparse(current_url)
+                location = f"{parsed_curr.scheme}://{parsed_curr.netloc}{location}"
+            current = url_to_entry.get(location)
+
+        if chain_hops >= 1:
+            # Final destination is the last Location or the last entry's URL
+            final_url = location if location else chain_start
+            redirect_chains.append({
+                "from": chain_start[:120],
+                "to": final_url[:120],
+                "hops": chain_hops,
+            })
+
+    return {
+        "has_timestamps": True,
+        "request_timeline": timeline,
+        "auth_flow": auth_flow,
+        "redirect_chains": redirect_chains,
+    }
+
+
+def detect_session_lifecycle(entries: list[dict]) -> dict:
+    """Analyze cookie flow: which cookies are set and used, and identify auth cookies."""
+    has_cookie_data = any(
+        e.get("request_cookies") is not None or e.get("response_cookies") is not None
+        for e in entries
+    )
+    if not has_cookie_data:
+        return {"has_cookie_data": False}
+
+    cookies_set = []  # list of {name, set_by, domain}
+    cookies_used = defaultdict(lambda: {"count": 0, "first_used": None})
+    seen_set = set()  # dedupe (name, domain) for cookies_set list
+
+    for e in entries:
+        url = e.get("url", "")
+        parsed = urlparse(url)
+        domain = parsed.hostname or ""
+
+        # Response cookies (Set-Cookie)
+        resp_cookies = e.get("response_cookies", []) or []
+        for rc in resp_cookies:
+            name = rc.get("name", "") if isinstance(rc, dict) else ""
+            if not name:
+                continue
+            key = (name, domain)
+            if key not in seen_set:
+                seen_set.add(key)
+                cookies_set.append({
+                    "name": name,
+                    "set_by": url[:120],
+                    "domain": domain,
+                })
+
+        # Request cookies (sent with request)
+        req_cookies = e.get("request_cookies", {}) or {}
+        for name in req_cookies:
+            entry = cookies_used[name]
+            entry["count"] += 1
+            if entry["first_used"] is None:
+                entry["first_used"] = url[:120]
+
+    # Identify auth cookies
+    all_cookie_names = set(c["name"] for c in cookies_set) | set(cookies_used.keys())
+    auth_cookies = sorted(
+        name for name in all_cookie_names
+        if _AUTH_COOKIE_NAMES.search(name)
+    )
+
+    # Determine session pattern
+    if not cookies_set and not cookies_used:
+        session_pattern = "no_session"
+    elif auth_cookies:
+        # Check if auth cookies are refreshed (set multiple times across different URLs)
+        auth_set_count = sum(1 for c in cookies_set if c["name"] in auth_cookies)
+        if auth_set_count > len(auth_cookies):
+            session_pattern = "token_refresh"
+        else:
+            session_pattern = "cookie_auth"
+    else:
+        session_pattern = "tracking_only"
+
+    return {
+        "has_cookie_data": True,
+        "cookies_set": cookies_set[:30],  # cap output
+        "cookies_used": {k: v for k, v in list(cookies_used.items())[:30]},
+        "auth_cookies": auth_cookies,
+        "session_pattern": session_pattern,
+    }
+
+
+def classify_endpoints_by_size(entries: list[dict]) -> dict:
+    """Classify endpoint groups by response body size."""
+    has_size_data = any(e.get("response_body_size") is not None for e in entries)
+    if not has_size_data:
+        return {"has_size_data": False}
+
+    total_bytes = 0
+    largest = {"url": "", "size": 0}
+    size_distribution = {"large": 0, "medium": 0, "small": 0, "zero": 0}
+
+    # Group sizes by endpoint prefix (reuse grouping logic)
+    prefix_sizes = defaultdict(list)
+
+    for e in entries:
+        size = e.get("response_body_size")
+        if size is None:
+            continue
+
+        url = e.get("url", "")
+        if _is_noise_url(url) or _is_static_asset(e):
+            continue
+
+        total_bytes += size
+
+        if size > largest["size"]:
+            largest = {"url": url[:120], "size": size}
+
+        # Classify
+        if size == 0:
+            size_distribution["zero"] += 1
+        elif size < 1024:
+            size_distribution["small"] += 1
+        elif size <= 51200:
+            size_distribution["medium"] += 1
+        else:
+            size_distribution["large"] += 1
+
+        # Group by prefix
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        segments = [_normalize_segment(s) for s in parsed.path.strip("/").split("/") if s]
+        if len(segments) >= 2:
+            prefix = f"{host}/{segments[0]}/{segments[1]}"
+        elif segments:
+            prefix = f"{host}/{segments[0]}"
+        else:
+            prefix = host
+        prefix_sizes[prefix].append(size)
+
+    # Compute per-prefix averages
+    endpoint_sizes = []
+    for prefix, sizes in sorted(prefix_sizes.items(), key=lambda x: -sum(x[1])):
+        avg = int(sum(sizes) / len(sizes)) if sizes else 0
+        if avg == 0:
+            classification = "empty"
+        elif avg < 1024:
+            classification = "small (<1KB)"
+        elif avg <= 51200:
+            classification = "medium (1-50KB)"
+        else:
+            classification = "large (>50KB)"
+        endpoint_sizes.append({
+            "prefix": prefix,
+            "avg_size": avg,
+            "classification": classification,
+        })
+
+    return {
+        "has_size_data": True,
+        "total_data_bytes": total_bytes,
+        "largest_response": largest,
+        "endpoint_sizes": endpoint_sizes[:20],
+        "size_distribution": size_distribution,
+    }
+
+
 def analyze(entries: list[dict]) -> dict:
     """Run all analyses and produce the complete report."""
     protocol = detect_protocol(entries)
@@ -796,11 +1109,14 @@ def analyze(entries: list[dict]) -> dict:
     pagination = detect_pagination(entries)
     stats = compute_stats(entries)
     suggestions = suggest_commands(endpoints, protocol)
+    request_sequence = detect_request_sequence(entries)
+    session_lifecycle = detect_session_lifecycle(entries)
+    endpoint_sizes = classify_endpoints_by_size(entries)
 
     return {
         "_meta": {
             "tool": "analyze-traffic.py",
-            "version": "1.2.1",
+            "version": "1.3.0",
             "description": "Auto-generated traffic analysis. Fields marked 'unknown' need manual agent analysis.",
         },
         "protocol": protocol,
@@ -811,6 +1127,9 @@ def analyze(entries: list[dict]) -> dict:
         "pagination": pagination,
         "stats": stats,
         "suggested_commands": suggestions,
+        "request_sequence": request_sequence,
+        "session_lifecycle": session_lifecycle,
+        "endpoint_sizes": endpoint_sizes,
     }
 
 
@@ -897,6 +1216,38 @@ def main():
             for sg in report["suggested_commands"][:8]:
                 cmds = ", ".join(c["name"] for c in sg["commands"])
                 print(f"  {sg['group']}: {cmds}")
+
+        # Request sequence
+        seq = report.get("request_sequence", {})
+        if seq.get("has_timestamps"):
+            print(f"\nRequest sequence: {len(seq.get('request_timeline', []))} requests in timeline")
+            if seq.get("auth_flow", {}).get("detected"):
+                steps = seq["auth_flow"]["steps"]
+                login_steps = [s for s in steps if s["action"] == "login"]
+                api_steps = [s for s in steps if s["action"] == "api_call"]
+                print(f"  Auth flow: {len(login_steps)} login step(s), {len(api_steps)} authenticated API call(s)")
+            if seq.get("redirect_chains"):
+                for chain in seq["redirect_chains"][:3]:
+                    print(f"  Redirect: {chain['from'][:60]} -> {chain['to'][:60]} ({chain['hops']} hops)")
+
+        # Session lifecycle
+        sess = report.get("session_lifecycle", {})
+        if sess.get("has_cookie_data"):
+            print(f"\nSession lifecycle: pattern={sess.get('session_pattern', 'unknown')}")
+            if sess.get("auth_cookies"):
+                print(f"  Auth cookies: {', '.join(sess['auth_cookies'][:10])}")
+            print(f"  Cookies set: {len(sess.get('cookies_set', []))}, Cookies used: {len(sess.get('cookies_used', {}))}")
+
+        # Endpoint sizes
+        esz = report.get("endpoint_sizes", {})
+        if esz.get("has_size_data"):
+            dist = esz.get("size_distribution", {})
+            total_kb = esz.get("total_data_bytes", 0) / 1024
+            print(f"\nEndpoint sizes: {total_kb:.1f} KB total")
+            print(f"  Distribution: {dist.get('large', 0)} large, {dist.get('medium', 0)} medium, {dist.get('small', 0)} small, {dist.get('zero', 0)} zero")
+            if esz.get("largest_response", {}).get("size", 0) > 0:
+                lr = esz["largest_response"]
+                print(f"  Largest: {lr['url'][:60]} ({lr['size']} bytes)")
     else:
         output_json = json.dumps(report, indent=2, default=str)
         if args.output:

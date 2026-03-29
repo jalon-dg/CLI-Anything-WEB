@@ -1,7 +1,7 @@
 ---
 name: cli-anything-web:record
 description: Record network traffic from a web app without generating a CLI. Useful for initial exploration or adding more coverage data.
-argument-hint: <url> [--duration <minutes>]
+argument-hint: <url> [--duration <minutes>] [--mitmproxy]
 allowed-tools: Bash(*), Read, Write, mcp__chrome-devtools__*
 ---
 
