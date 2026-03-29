@@ -82,6 +82,32 @@ Do NOT report UX/output issues (that's output-ux-reviewer).
   instead of a typed domain exception, it bypasses `handle_errors()` and produces
   non-structured error output in `--json` mode.
 
+**CI Integration (.github/workflows/tests.yml):**
+- CLI MUST have an entry in the test matrix: `{ name: <app>, dir: <app>/agent-harness, pkg: <app_pkg> }`
+- The matrix entry name MUST match the branch protection required check name
+- Read `.github/workflows/tests.yml` and grep for the app name in `matrix.cli`
+- If missing, report as **Critical** — PRs adding this CLI cannot be merged without it
+
+**Repo-Level Integration (9 checks — all mandatory):**
+
+Read each file below and grep for the app name. Report each missing entry as **Important**.
+
+| # | File | What to grep for | What must exist |
+|---|------|-----------------|-----------------|
+| 1 | `.github/workflows/tests.yml` | `name: <app>` in matrix.cli | Test matrix entry → **Critical** if missing |
+| 2 | `README.md` | `cli-web-<app>` in examples table | Row with CLI, Website, Protocol, Auth, Skill, Description |
+| 3 | `README.md` | `cli-web-<app>` in "Try them yourself" block | Install + example command in code block |
+| 4 | `README.md` | `CLIs_generated` badge | Count must match total CLIs (count matrix entries) |
+| 5 | `README.md` | Hero badge `N_CLIs` | Count must match total CLIs |
+| 6 | `registry.json` | `cli-web-<app>` | Entry with name, website, protocol, auth, commands, install |
+| 7 | `CLAUDE.md` | `cli-web-<app>` in Generated CLIs table | Row with CLI, directory, protocol, key pattern |
+| 8 | `docs/registry/index.html` | `name:"<app>"` in JS data array | Entry with name, icon, site, desc, category, proto, cmds, install |
+| 9 | `.claude/skills/<app>-cli/SKILL.md` | File exists | Skill file for Claude Code auto-discovery |
+
+**How to verify badge counts:** Count the entries in `.github/workflows/tests.yml`
+matrix.cli array. The `CLIs_generated-N` and hero `N_CLIs` badges in README.md
+must show that same number. If they show a lower number, report as **Important**.
+
 **Base Exception Class:**
 - Must have `to_dict()` method returning `{"error": True, "code": "...", "message": "..."}`
 - `RateLimitError.to_dict()` must include `retry_after`

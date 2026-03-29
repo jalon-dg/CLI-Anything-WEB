@@ -288,13 +288,26 @@ The pipeline is NOT done until ALL of these are checked:
 ### CI Test Matrix Update (MANDATORY)
 
 Every new CLI MUST be added to `.github/workflows/tests.yml` so unit tests run
-on every push/PR. Add a new entry to the `matrix.cli` array:
+on every push/PR. **Do both steps — missing either blocks merges.**
+
+**Step 1: Add to test matrix** in `.github/workflows/tests.yml`:
 
 ```yaml
 - { name: <app>, dir: <app>/agent-harness, pkg: <app_underscore> }
 ```
 
 Where `<app_underscore>` replaces hyphens with underscores (e.g., `gh-trending` → `gh_trending`).
+
+**Step 2: Add to branch protection required checks** so PRs require the new check:
+
+```bash
+# Get current checks, append the new one, update
+gh api repos/<owner>/<repo>/branches/main/protection/required_status_checks \
+  -X PATCH --input - <<EOF
+{"strict": true, "contexts": [...existing..., "<app>"]}
+EOF
+```
+
 Verify the entry runs: `python -m pytest <dir>/cli_web/<pkg>/tests/test_core.py -v`
 
 All key rules (naming, auth, --json, REPL, rate limits) are defined in
