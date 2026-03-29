@@ -19,14 +19,14 @@
   <a href="https://github.com/ItamarZand88/CLI-Anything-WEB/stargazers"><img src="https://img.shields.io/github/stars/ItamarZand88/CLI-Anything-WEB?style=social" alt="GitHub Stars"></a>
   <a href="https://github.com/ItamarZand88/CLI-Anything-WEB/issues"><img src="https://img.shields.io/github/issues/ItamarZand88/CLI-Anything-WEB" alt="Issues"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/CLIs_generated-12-brightgreen" alt="12 CLIs">
+  <img src="https://img.shields.io/badge/CLIs_generated-13-brightgreen" alt="13 CLIs">
   <img src="https://img.shields.io/badge/claude%20code-plugin-blueviolet" alt="Claude Code Plugin">
   <a href="https://itamarzand88.github.io/CLI-Anything-WEB/registry/"><img src="https://img.shields.io/badge/registry-live-orange" alt="CLI Registry"></a>
 </p>
 
 <p align="center">
   <a href="#-quick-start"><img src="https://img.shields.io/badge/Quick_Start-blue?style=for-the-badge" alt="Quick Start"></a>
-  <a href="#-examples"><img src="https://img.shields.io/badge/12_CLIs-brightgreen?style=for-the-badge" alt="Examples"></a>
+  <a href="#-examples"><img src="https://img.shields.io/badge/13_CLIs-brightgreen?style=for-the-badge" alt="Examples"></a>
   <a href="#-supported-protocols"><img src="https://img.shields.io/badge/7_Protocols-orange?style=for-the-badge" alt="Protocols"></a>
   <a href="#-contributing"><img src="https://img.shields.io/badge/Contributing-purple?style=for-the-badge" alt="Contributing"></a>
 </p>
@@ -106,6 +106,7 @@ The agent opens a browser, asks you to log in if needed, captures traffic, and g
 | [`cli-web-gh-trending`](gh-trending/) | GitHub Trending | HTML scraping | None | [📖 Skill](.claude/skills/gh-trending-cli/SKILL.md) | Trending repos & developers with language/time filters |
 | [`cli-web-youtube`](youtube/) | YouTube | InnerTube REST API | None | [📖 Skill](.claude/skills/youtube-cli/SKILL.md) | Search videos, video details, trending, channel info |
 | [`cli-web-hackernews`](hackernews/) | Hacker News | REST API (Firebase + Algolia) | Cookie (optional) | [📖 Skill](.claude/skills/hackernews-cli/SKILL.md) | Stories, search, comments, users, upvote, submit, comment, favorite |
+| [`cli-web-codewiki`](codewiki/) | Google Code Wiki | batchexecute RPC | None | [📖 Skill](.claude/skills/codewiki-cli/SKILL.md) | AI-generated repo docs, wiki sections, Gemini chat, download as .md |
 
 <details>
 <summary><strong>Try them yourself</strong></summary>
@@ -154,6 +155,11 @@ cli-web-reddit feed hot --limit 5 --json
 # Hacker News — stories, search, upvote, submit
 pip install -e hackernews/agent-harness
 cli-web-hackernews stories top -n 5 --json
+
+# Google Code Wiki — AI-generated repo docs + Gemini chat
+pip install -e codewiki/agent-harness
+cli-web-codewiki wiki sections excalidraw/excalidraw --json
+cli-web-codewiki chat ask "How does rendering work?" --repo excalidraw/excalidraw --json
 
 # Google AI Mode — AI-powered search
 cd gai/agent-harness && pip install -e . && playwright install chromium
