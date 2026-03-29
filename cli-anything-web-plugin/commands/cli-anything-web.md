@@ -1,7 +1,7 @@
 ---
 name: cli-anything-web
 description: Generate a complete agent-native CLI for any web app by recording and analyzing network traffic via playwright-cli. Runs the full pipeline with site assessment, capture, implementation, testing, and verification.
-argument-hint: <url>
+argument-hint: <url> [--mitmproxy]
 allowed-tools: Bash(*), Read, Write, Edit, mcp__chrome-devtools__*
 ---
 
@@ -10,7 +10,13 @@ allowed-tools: Bash(*), Read, Write, Edit, mcp__chrome-devtools__*
 Read the methodology overview:
 @${CLAUDE_PLUGIN_ROOT}/HARNESS.md
 
-Target URL: $ARGUMENTS
+Target URL and flags: $ARGUMENTS
+
+## Capture Mode Detection
+
+Check if `--mitmproxy` flag is present in the arguments:
+- **With `--mitmproxy`**: Use mitmproxy-capture.py for traffic capture (no body truncation, real-time filtering, enhanced analysis). Requires `pip install mitmproxy` (Python 3.12+).
+- **Without `--mitmproxy`** (default): Use standard playwright-cli tracing (the original method).
 
 ## Prerequisites Check
 
@@ -20,6 +26,11 @@ Target URL: $ARGUMENTS
 **If PLAYWRIGHT_OK** → use playwright-cli for all operations (primary path).
 
 **If PLAYWRIGHT_FAIL** → If playwright-cli is not available, see HARNESS.md for the MCP fallback path.
+
+### Step 1b: If `--mitmproxy` flag was passed, also verify mitmproxy
+!`python -c "import mitmproxy; print('MITMPROXY_OK')" 2>&1 || echo "MITMPROXY_FAIL"`
+
+**If MITMPROXY_FAIL** → Tell user to `pip install mitmproxy` or drop the `--mitmproxy` flag.
 
 ### NEVER use `mcp__claude-in-chrome__*` tools -- blocked, cannot capture request bodies.
 

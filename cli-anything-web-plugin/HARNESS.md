@@ -177,8 +177,9 @@ under `skills/*/references/` and are loaded when the relevant skill activates.
 |--------|---------|-------------|
 | `phase-state.py` | Track all 4 pipeline phases — skip completed, retry failed | Before each phase, prevents re-running expensive work |
 | `capture-checkpoint.py` | Save/restore capture session state (within Phase 1) | Resume interrupted captures, prevent duplicate work |
-| `parse-trace.py` | Convert trace files → raw-traffic.json | After `tracing-stop` |
-| `analyze-traffic.py` | Analyze raw-traffic.json → protocol/endpoint detection | Auto-run by parse-trace.py |
+| `parse-trace.py` | Convert trace files → raw-traffic.json | After `tracing-stop` (default capture method) |
+| `mitmproxy-capture.py` | Optional proxy-based capture — no body truncation, real-time noise filtering, dedup, enhanced metadata (timestamps, cookies, body sizes). Supports `start-proxy`/`stop-proxy` for agent-driven browsing. Activated with `--mitmproxy` flag. Requires `pip install mitmproxy` (Python 3.12+). | When `--mitmproxy` flag is passed to `/cli-anything-web` |
+| `analyze-traffic.py` | Analyze raw-traffic.json → protocol/endpoint detection. v1.3.0 adds request sequence, session lifecycle, and endpoint size analysis when enhanced fields are present. | Auto-run by parse-trace.py or mitmproxy-capture.py |
 | `extract-browser-cookies.py` | Cookie extraction utility | During auth implementation |
 
 ### Methodology References (`skills/methodology/references/`)

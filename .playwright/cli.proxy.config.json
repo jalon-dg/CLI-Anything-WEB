@@ -1,0 +1,20 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "launchOptions": {
+      "headless": false,
+      "channel": "chrome"
+    },
+    "contextOptions": {
+      "proxy": {
+        "server": "http://127.0.0.1:8080"
+      },
+      "ignoreHTTPSErrors": true,
+      "viewport": { "width": 1440, "height": 900 }
+    }
+  },
+  "outputDir": ".playwright-cli",
+  "network": {
+    "allowedOrigins": ["**"]
+  }
+}
