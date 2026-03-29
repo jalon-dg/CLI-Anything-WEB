@@ -2,7 +2,7 @@ name: Unit Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, release-please--branches--main]
   pull_request:
     branches: [main]
 
@@ -25,6 +25,7 @@ jobs:
           - { name: gai,         dir: gai/agent-harness,         pkg: gai }
           - { name: youtube,     dir: youtube/agent-harness,     pkg: youtube }
           - { name: hackernews,  dir: hackernews/agent-harness,  pkg: hackernews }
+          - { name: codewiki,    dir: codewiki/agent-harness,    pkg: codewiki }
 
     name: ${{ matrix.cli.name }}
 
