@@ -32,20 +32,27 @@ def post_table(posts: list[dict], title: str = "Posts") -> None:
 
 
 def comment_table(comments: list[dict], title: str = "Comments") -> None:
-    """Print a Rich table of comment summaries."""
+    """Print a Rich table of comment summaries with tree indentation."""
     table = Table(title=title, show_lines=True)
     table.add_column("Score", justify="right", style="yellow", no_wrap=True)
     table.add_column("Author", style="green", no_wrap=True)
     table.add_column("Comment", max_width=60)
-    table.add_column("OP", justify="center")
+    table.add_column("Info", justify="center", no_wrap=True)
 
     for c in comments:
-        indent = "  " * c.get("depth", 0)
+        depth = c.get("depth", 0)
+        indent = "│ " * depth
+        author = c.get("author", "")
+        tags = []
+        if c.get("is_submitter"):
+            tags.append("OP")
+        info = " ".join(tags)
+
         table.add_row(
             str(c.get("score", 0)),
-            c.get("author", ""),
-            _trunc(f"{indent}{c.get('body', '')}", 60),
-            "OP" if c.get("is_submitter") else "",
+            f"{indent}{author}",
+            _trunc(f"{c.get('body', '')}", 60),
+            info,
         )
     console.print(table)
 
