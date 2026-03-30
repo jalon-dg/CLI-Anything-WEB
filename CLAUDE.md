@@ -103,7 +103,7 @@ bash cli-anything-web-plugin/verify-plugin.sh
 ## Tech Stack for Generated CLIs
 
 - **CLI framework**: Click (with `@click.group(invoke_without_command=True)`)
-- **HTTP client**: httpx (default), or curl_cffi for anti-bot protected sites (Cloudflare, AWS WAF, generic challenges). Use curl_cffi when plain httpx gets 401/403 with "bot" or "challenge" in response body. Sites can add protection at any time — if a working CLI starts getting blocked, switch to curl_cffi.
+- **HTTP client**: httpx (default), or curl_cffi for anti-bot protected sites (Cloudflare, AWS WAF, generic challenges). Use curl_cffi when plain httpx gets 401/403 with "bot" or "challenge" in response body. Sites can add protection at any time — if a working CLI starts getting blocked, switch to curl_cffi. For Cloudflare **managed challenge** sites (page title "Just a moment...") where curl_cffi also fails, use **camoufox** (stealth Firefox, `pip install camoufox`) for browser-interactive operations in headless mode. Combine with curl_cffi for read-only endpoints (hybrid pattern).
 - **HTML parsing**: BeautifulSoup4 (for SSR sites)
 - **Output**: Rich (`>=13.0`) for tables, spinners, colored status; custom table formatting
 - **Auth flow**: Python `sync_playwright()` browser login → cookie extraction → `auth.json`; env var fallback for CI. Optional: `playwright-stealth` if bot detection blocks login.
