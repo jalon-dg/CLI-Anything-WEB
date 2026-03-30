@@ -147,7 +147,7 @@ Sites protected by AWS WAF return a 202 JavaScript challenge page to raw HTTP cl
 | `cli-web-pexels` | `pexels/` | SSR + __NEXT_DATA__ (curl_cffi) | Cloudflare bypass, photo/video download |
 | `cli-web-unsplash` | `unsplash/` | REST API (curl_cffi) | Public JSON API, anti-bot bypass |
 | `cli-web-producthunt` | `producthunt/` | HTML scraping (curl_cffi) | Cloudflare bypass |
-| `cli-web-futbin` | `futbin/` | HTML + JSON API | HTML scraping with httpx |
+| `cli-web-futbin` | `futbin/` | HTML + JSON API | HTML scraping with httpx, market analysis/scan/arbitrage, trading signals |
 | `cli-web-gh-trending` | `gh-trending/` | HTML scraping | Simple SSR, no auth |
 | `cli-web-youtube` | `youtube/` | InnerTube REST API (httpx) | Internal POST API, no auth, search/video/channel |
 | `cli-web-hackernews` | `hackernews/` | REST API (httpx) | Firebase + Algolia API, cookie auth, stories/search/users/upvote/submit/comment |

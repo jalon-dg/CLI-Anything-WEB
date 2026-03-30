@@ -233,9 +233,68 @@ class FutbinClient:
             if m:
                 version = m.group(1).strip()
 
-        # Club/nation — not reliably available from the detail page HTML
+        # Club/nation/skills/WF — from player-info-box section
         club = ""
         nation = ""
+        skill_moves = None
+        weak_foot = None
+        height = ""
+        foot = ""
+        header_box = soup.find(class_="player-header-info-box") or soup.find(class_="player-info-box")
+        if header_box:
+            header_text = header_box.get_text(" ", strip=True)
+            # Skills/WF from "Skills 5 Weak Foot 4"
+            sm = re.search(r"Skills\s*(\d)", header_text)
+            if sm:
+                skill_moves = int(sm.group(1))
+            wfm = re.search(r"Weak Foot\s*(\d)", header_text)
+            if wfm:
+                weak_foot = int(wfm.group(1))
+            hm = re.search(r"Height\s*([\d]+cm)", header_text)
+            if hm:
+                height = hm.group(1)
+            fm = re.search(r"Foot\s*(Left|Right)", header_text, re.IGNORECASE)
+            if fm:
+                foot = fm.group(1)
+            # Nation and club from header: "France LALIGA EA SPORTS Real Madrid Gold Rare"
+            # Nation is first word(s) before league name
+            nm = re.match(r"^([\w\s]+?)\s+(?:LALIGA|Premier|Serie|Bundesliga|Ligue)", header_text)
+            if nm:
+                nation = nm.group(1).strip()
+
+        # Trend — "Trend: 0.17% (-12K)"
+        trend = ""
+        full_text = soup.get_text(" ", strip=True)
+        trend_m = re.search(r"Trend:\s*([\d.]+%\s*\([^)]+\))", full_text)
+        if trend_m:
+            trend = trend_m.group(1)
+
+        # Price range — "Price Range: 840,000 - 15,000,000"
+        price_range_min = None
+        price_range_max = None
+        pr_m = re.search(r"Price Range:\s*([\d,]+)\s*[-–]\s*([\d,]+)", full_text)
+        if pr_m:
+            price_range_min = _coin_str_to_int(pr_m.group(1))
+            price_range_max = _coin_str_to_int(pr_m.group(2))
+
+        # Multiple BIN listings (lowest-price-1 through lowest-price-5)
+        ps_bin_listings = []
+        if ps_box:
+            for i in range(1, 6):
+                el = ps_box.find(class_=f"lowest-price-{i}")
+                if el:
+                    val = _coin_str_to_int(el.get_text(strip=True))
+                    if val and val > 0:
+                        ps_bin_listings.append(val)
+
+        pc_bin_listings = []
+        if pc_box:
+            for i in range(1, 6):
+                el = pc_box.find(class_=f"lowest-price-{i}")
+                if el:
+                    val = _coin_str_to_int(el.get_text(strip=True))
+                    if val and val > 0:
+                        pc_bin_listings.append(val)
 
         return Player(
             id=player_id,
@@ -250,6 +309,15 @@ class FutbinClient:
             ps_price=ps_price,
             xbox_price=xbox_price,
             stats=stats,
+            skill_moves=skill_moves,
+            weak_foot=weak_foot,
+            height=height,
+            foot=foot,
+            trend=trend,
+            price_range_min=price_range_min,
+            price_range_max=price_range_max,
+            ps_bin_listings=ps_bin_listings,
+            pc_bin_listings=pc_bin_listings,
         )
 
     # ──────────────────────────────────────────────
@@ -849,7 +917,7 @@ class FutbinClient:
             cost_xbox = None
             repeatable = "Repeatable" in text
 
-            exp_m = re.search(r"Expires\s+(.+?)(?:\s+Repeatable|\s+Completed|\s*$)", text, re.IGNORECASE)
+            exp_m = re.search(r"Expires\s+(\d+\s+\w+)", text, re.IGNORECASE)
             if exp_m:
                 expires = exp_m.group(1).strip()
 
@@ -918,6 +986,7 @@ class FutbinClient:
                 evo_id = int(parts[1])
             except (ValueError, IndexError):
                 continue
+            slug = parts[2] if len(parts) > 2 else ""
 
             # Name: text-center div inside the top link
             name = ""
@@ -939,10 +1008,10 @@ class FutbinClient:
             unlock_time = ""
             repeatable = "Repeatable" in text
 
-            exp_m = re.search(r"EXPIRES?\s+(.+?)(?:\s+UNLOCK|\s+Free|\s*$)", text, re.IGNORECASE)
+            exp_m = re.search(r"EXPIRES?\s+(\d+\s+\w+)", text, re.IGNORECASE)
             if exp_m:
                 expires = exp_m.group(1).strip()
-            unlock_m = re.search(r"UNLOCK\s+(.+?)(?:\s+EXPIRES|\s*$)", text, re.IGNORECASE)
+            unlock_m = re.search(r"UNLOCK\s+(\d+\s+\w+)", text, re.IGNORECASE)
             if unlock_m:
                 unlock_time = unlock_m.group(1).strip()
 
@@ -955,6 +1024,7 @@ class FutbinClient:
                     year=year,
                     unlock_time=unlock_time,
                     repeatable=repeatable,
+                    slug=slug,
                 )
             )
         # Deduplicate by id
@@ -1028,7 +1098,22 @@ class FutbinClient:
     def get_evolution_detail(self, evo_id: int) -> "EvolutionDetail":
         """Get structured evolution details (requirements, upgrades)."""
         from .models import EvolutionDetail
-        url = f"/evolutions/{evo_id}"
+        evo_id = int(evo_id)
+        # Evolution detail pages require the slug in the URL
+        # First try to find the slug from the list page
+        list_soup = self._soup("/evolutions")
+        slug = ""
+        for link in list_soup.find_all("a", class_="evolutions-card-top"):
+            href = link.get("href", "")
+            parts = href.strip("/").split("/")
+            if len(parts) >= 2:
+                try:
+                    if int(parts[1]) == evo_id:
+                        slug = parts[2] if len(parts) > 2 else ""
+                        break
+                except (ValueError, IndexError):
+                    continue
+        url = f"/evolutions/{evo_id}/{slug}" if slug else f"/evolutions/{evo_id}"
         soup = self._soup(url)
         if not soup:
             raise NotFoundError(f"Evolution {evo_id} not found")

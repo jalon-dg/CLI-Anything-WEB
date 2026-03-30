@@ -8,7 +8,7 @@
       "auth": "none",
       "directory": "futbin/agent-harness",
       "namespace": "cli_web.futbin",
-      "commands": ["players search", "players get", "players list", "players compare", "players price-history", "market index", "market popular", "market latest", "market cheapest", "market movers", "market fodder", "sbc list", "sbc get", "evolutions list", "evolutions get", "config set", "config show", "config reset"],
+      "commands": ["players search", "players get", "players list", "players compare", "players price-history", "players versions", "market index", "market popular", "market latest", "market cheapest", "market movers", "market fodder", "market analyze", "market scan", "market arbitrage", "sbc list", "sbc get", "evolutions list", "evolutions get", "config set", "config show", "config reset"],
       "install": "pip install -e futbin/agent-harness"
     },
     {

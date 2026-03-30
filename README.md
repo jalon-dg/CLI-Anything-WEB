@@ -102,7 +102,7 @@ The agent opens a browser, asks you to log in if needed, captures traffic, and g
 | [`cli-web-pexels`](pexels/) | Pexels | SSR + __NEXT_DATA__ (curl_cffi) | None | [📖 Skill](.claude/skills/pexels-cli/SKILL.md) | Free stock photos & videos — search, download, collections, profiles |
 | [`cli-web-unsplash`](unsplash/) | Unsplash | REST API (curl_cffi) | None | [📖 Skill](.claude/skills/unsplash-cli/SKILL.md) | Photo search, download, topics, collections, profiles |
 | [`cli-web-producthunt`](producthunt/) | Product Hunt | HTML scraping (curl_cffi) | None | [📖 Skill](.claude/skills/producthunt-cli/SKILL.md) | Today's launches, leaderboards, product details |
-| [`cli-web-futbin`](futbin/) | FUTBIN | HTML + JSON API | None | [📖 Skill](.claude/skills/futbin-cli/SKILL.md) | EA FC player database — search, compare, prices |
+| [`cli-web-futbin`](futbin/) | FUTBIN | HTML + JSON API | None | [📖 Skill](.claude/skills/futbin-cli/SKILL.md) | EA FC player database — search, compare, prices, market analysis, arbitrage, trading signals |
 | [`cli-web-gh-trending`](gh-trending/) | GitHub Trending | HTML scraping | None | [📖 Skill](.claude/skills/gh-trending-cli/SKILL.md) | Trending repos & developers with language/time filters |
 | [`cli-web-youtube`](youtube/) | YouTube | InnerTube REST API | None | [📖 Skill](.claude/skills/youtube-cli/SKILL.md) | Search videos, video details, trending, channel info |
 | [`cli-web-hackernews`](hackernews/) | Hacker News | REST API (Firebase + Algolia) | Cookie (optional) | [📖 Skill](.claude/skills/hackernews-cli/SKILL.md) | Stories, search, comments, users, upvote, submit, comment, favorite |

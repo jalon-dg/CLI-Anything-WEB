@@ -43,9 +43,19 @@ class Player:
     ps_price: Optional[int] = None
     xbox_price: Optional[int] = None
     stats: dict = field(default_factory=dict)
+    # Extended fields (populated from detail page only)
+    skill_moves: Optional[int] = None
+    weak_foot: Optional[int] = None
+    height: str = ""
+    foot: str = ""
+    trend: str = ""
+    price_range_min: Optional[int] = None
+    price_range_max: Optional[int] = None
+    ps_bin_listings: list = field(default_factory=list)
+    pc_bin_listings: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "id": self.id,
             "name": self.name,
             "position": self.position,
@@ -59,6 +69,24 @@ class Player:
             "xbox_price": self.xbox_price,
             "stats": self.stats,
         }
+        # Include extended fields only if populated (detail page)
+        if self.skill_moves is not None:
+            d["skill_moves"] = self.skill_moves
+        if self.weak_foot is not None:
+            d["weak_foot"] = self.weak_foot
+        if self.height:
+            d["height"] = self.height
+        if self.foot:
+            d["foot"] = self.foot
+        if self.trend:
+            d["trend"] = self.trend
+        if self.price_range_min is not None:
+            d["price_range"] = {"min": self.price_range_min, "max": self.price_range_max}
+        if self.ps_bin_listings:
+            d["ps_bin_listings"] = self.ps_bin_listings
+        if self.pc_bin_listings:
+            d["pc_bin_listings"] = self.pc_bin_listings
+        return d
 
 
 @dataclass
@@ -97,8 +125,10 @@ class Evolution:
     year: int
     unlock_time: str = ""
     repeatable: bool = False
+    slug: str = ""
 
     def to_dict(self) -> dict:
+        path = f"/evolutions/{self.id}/{self.slug}" if self.slug else f"/evolutions/{self.id}"
         return {
             "id": self.id,
             "name": self.name,
@@ -107,7 +137,7 @@ class Evolution:
             "year": self.year,
             "unlock_time": self.unlock_time,
             "repeatable": self.repeatable,
-            "url": f"https://www.futbin.com/evolutions/{self.id}",
+            "url": f"https://www.futbin.com{path}",
         }
 
 

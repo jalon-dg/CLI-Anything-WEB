@@ -1,7 +1,11 @@
-"""Player commands: search, get, list, compare, price-history."""
+"""Player commands: search, get, list, compare, price-history, versions."""
 import click
 from ..core.client import FutbinClient
-from ..utils.output import print_json, print_table, print_players_rich, print_comparison, coins_display, print_price_history
+from ..core.analysis import compute_value_score, compute_total_stats, compute_coins_per_stat
+from ..utils.output import (
+    print_json, print_table, print_players_rich, print_comparison,
+    coins_display, print_price_history, print_versions,
+)
 from ..utils.helpers import handle_errors, require_year
 
 
@@ -111,12 +115,31 @@ def list_players(position, rating_min, rating_max, version, min_price, max_price
 @click.option("--year", type=int, default=None, help="Game year.")
 @click.option("--json", "use_json", is_flag=True, default=False, help="Output as JSON.")
 def compare(player1_id, player2_id, year, use_json):
-    """Compare two players side-by-side."""
+    """Compare two players side-by-side with value metrics."""
     with handle_errors(json_mode=use_json):
         yr = require_year(year)
         with FutbinClient() as client:
             comp = client.compare_players(player1_id, player2_id, year=yr)
-        print_comparison(comp, json_mode=use_json)
+
+        # Compute value metrics for each player
+        p1_total = compute_total_stats(comp.player1.stats)
+        p2_total = compute_total_stats(comp.player2.stats)
+        p1_cps = compute_coins_per_stat(p1_total, comp.player1.ps_price)
+        p2_cps = compute_coins_per_stat(p2_total, comp.player2.ps_price)
+
+        value_winner = None
+        if p1_cps is not None and p2_cps is not None:
+            value_winner = comp.player1.name if p1_cps < p2_cps else comp.player2.name
+
+        value_data = {
+            "player1_total_stats": p1_total,
+            "player2_total_stats": p2_total,
+            "player1_coins_per_stat": p1_cps,
+            "player2_coins_per_stat": p2_cps,
+            "value_winner": value_winner,
+        }
+
+        print_comparison(comp, json_mode=use_json, value_data=value_data)
 
 
 @players.command("price-history")
@@ -133,3 +156,63 @@ def price_history(player_id, year, use_json):
             from ..core.exceptions import NotFoundError
             raise NotFoundError(f"No price data for player {player_id}")
         print_price_history(history, json_mode=use_json)
+
+
+@players.command("versions")
+@click.option("--name", required=True, help="Player name to search.")
+@click.option("--year", type=int, default=None, help="Game year (default: config or 26).")
+@click.option("--json", "use_json", is_flag=True, default=False, help="Output as JSON.")
+def versions(name, year, use_json):
+    """All versions of a player compared with value scores."""
+    with handle_errors(json_mode=use_json):
+        yr = require_year(year)
+        with FutbinClient() as client:
+            search_results = client.search_players(name, year=yr)
+            if not search_results:
+                from ..core.exceptions import NotFoundError
+                raise NotFoundError(f"No players found for '{name}'")
+
+            # Filter to only versions of the same base player
+            # Use the top result's name as the reference
+            base_name = search_results[0].name.lower()
+            same_player = [p for p in search_results if p.name.lower() == base_name]
+            # If only one exact match, include close matches (name contained)
+            if len(same_player) <= 1:
+                same_player = [p for p in search_results
+                               if base_name in p.name.lower() or p.name.lower() in base_name]
+            candidates = same_player[:10]
+
+            from rich.progress import Progress
+            detailed = []
+            with Progress() as progress:
+                task = progress.add_task(f"Fetching {len(candidates)} versions...", total=len(candidates))
+                for p in candidates:
+                    try:
+                        full = client.get_player(p.id, year=yr)
+                        if full:
+                            detailed.append(full)
+                    except Exception:
+                        pass
+                    progress.advance(task)
+
+        if not detailed:
+            from ..core.exceptions import NotFoundError
+            raise NotFoundError(f"Could not load details for '{name}'")
+
+        # Sort by rating descending
+        detailed.sort(key=lambda p: p.rating, reverse=True)
+
+        # Compute value scores
+        version_data = []
+        for p in detailed:
+            d = p.to_dict()
+            d["value_score"] = compute_value_score(p.stats, p.ps_price)
+            d["total_stats"] = compute_total_stats(p.stats)
+            version_data.append(d)
+
+        if use_json:
+            print_json(version_data)
+        else:
+            # Use search result name (clean, no version suffix)
+            base_display_name = search_results[0].name
+            print_versions(detailed, version_data, title=f"All Versions of {base_display_name}")
