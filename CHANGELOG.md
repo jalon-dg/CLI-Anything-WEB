@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0](https://github.com/ItamarZand88/CLI-Anything-WEB/compare/v0.5.0...v0.6.0) (2026-03-30)
+
+
+### Features
+
+* **chatgpt:** add cli-web-chatgpt — 14th CLI ([5f4b626](https://github.com/ItamarZand88/CLI-Anything-WEB/commit/5f4b626a65f48e96689e47035facf45634bb5832))
+* **chatgpt:** add cli-web-chatgpt — 14th CLI for ChatGPT ([2d4a353](https://github.com/ItamarZand88/CLI-Anything-WEB/commit/2d4a353985b521c6458b7f2d4bae2141e93949e0))
+
 ## [0.5.0](https://github.com/ItamarZand88/CLI-Anything-WEB/compare/v0.4.2...v0.5.0) (2026-03-30)
 
 
