@@ -123,6 +123,7 @@ def _print_repl_help():
     print("  Config:")
     print("    config set year 25                            Set default year")
     print("    config set platform pc                        Set default platform")
+    print("    config get <key>                              Get a setting value")
     print("    config show                                   Show current config")
     print("    config reset                                  Reset to defaults")
     print()
