@@ -158,6 +158,7 @@ cli-web-unsplash photos search "mountains" --json
 **Booking.com** — hotel search
 ```bash
 pip install -e booking/agent-harness
+cli-web-booking auth login        # required — fetches WAF browser cookies
 cli-web-booking search find "Paris" --json
 ```
 
@@ -177,12 +178,14 @@ cli-web-pexels photos search "mountains" --json
 **Reddit** — feeds, search, vote, comment, submit
 ```bash
 pip install -e reddit/agent-harness
+cli-web-reddit auth login         # optional — required for voting, commenting, submitting
 cli-web-reddit feed hot --limit 5 --json
 ```
 
 **Hacker News** — stories, search, upvote, submit
 ```bash
 pip install -e hackernews/agent-harness
+cli-web-hackernews auth login     # optional — required for upvoting, submitting, commenting
 cli-web-hackernews stories top -n 5 --json
 ```
 
@@ -196,6 +199,7 @@ cli-web-codewiki chat ask "How does rendering work?" --repo excalidraw/excalidra
 **ChatGPT** — ask questions, generate images
 ```bash
 pip install -e chatgpt/agent-harness
+cli-web-chatgpt auth login        # optional — required for image generation & conversations
 cli-web-chatgpt chat ask "Explain quantum computing in one sentence" --json
 cli-web-chatgpt chat image "A sunset over mountains" --output sunset.png --json
 ```
