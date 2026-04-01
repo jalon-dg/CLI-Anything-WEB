@@ -86,27 +86,36 @@ Response: {"styles": [{"id": "...", "title": "..."}]}
 ## CLI Command Structure
 
 ```
-cli-web-chatgpt [--json]
+cli-web-chatgpt
   chat ask <question>              Ask a question, get response
     --model <slug>                 Model (e.g. gpt-5-4-thinking)
     --conversation <id>            Continue existing conversation
+    --json                         Output as JSON
   chat image <prompt>              Generate an image
     --style <id>                   Apply a style to prompt
     --output/-o <path>             Save image to file
     --conversation <id>            Continue existing conversation
+    --json                         Output as JSON
   conversations list               List recent conversations
     --limit/-n <N>                 Number to show (default: 20)
     --archived                     Show archived
     --starred                      Show starred only
+    --json                         Output as JSON
   conversations get <id>           View conversation details
+    --json                         Output as JSON
   images list                      List recently generated images
     --limit/-n <N>                 Number to show (default: 10)
+    --json                         Output as JSON
   images download <file_id>        Download a generated image
     --conversation/-c <id>         (required) Conversation ID
     --output/-o <path>             Save path
+    --json                         Output as JSON
   images styles                    List available image styles
+    --json                         Output as JSON
   models                           List available models
+    --json                         Output as JSON
   me                               Show current user info
+    --json                         Output as JSON
   auth login                       Login via browser
   auth status                      Check auth status
   auth logout                      Remove stored credentials

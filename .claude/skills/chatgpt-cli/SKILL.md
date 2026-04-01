@@ -11,13 +11,13 @@ CLI for ChatGPT web interface. Ask questions, generate images, download images, 
 
 ```bash
 # Ask a question
-cli-web-chatgpt --json chat ask "What is the capital of France?"
+cli-web-chatgpt chat ask "What is the capital of France?" --json
 
 # Generate an image and save it
-cli-web-chatgpt --json chat image "A sunset over mountains" -o sunset.png
+cli-web-chatgpt chat image "A sunset over mountains" -o sunset.png --json
 
 # List recent conversations
-cli-web-chatgpt --json conversations list --limit 10
+cli-web-chatgpt conversations list --limit 10 --json
 ```
 
 ## Commands
@@ -25,66 +25,66 @@ cli-web-chatgpt --json conversations list --limit 10
 ### chat ask <question>
 Ask ChatGPT a question and get a text response.
 ```bash
-cli-web-chatgpt --json chat ask "Explain quantum computing in 3 sentences"
-cli-web-chatgpt --json chat ask "What is 100+200?"
-cli-web-chatgpt --json chat ask "Translate hello to Spanish" --conversation <id>
+cli-web-chatgpt chat ask "Explain quantum computing in 3 sentences" --json
+cli-web-chatgpt chat ask "What is 100+200?" --json
+cli-web-chatgpt chat ask "Translate hello to Spanish" --conversation <id> --json
 ```
-Options: `--model <slug>`, `--conversation <id>`
+Options: `--model <slug>`, `--conversation <id>`, `--json`
 Output: `{"success": true, "data": {"text": "...", "conversation_id": "...", "model": "auto"}}`
 
 ### chat image <prompt>
 Generate an image with ChatGPT's DALL-E.
 ```bash
-cli-web-chatgpt --json chat image "A cute cat wearing a hat"
-cli-web-chatgpt --json chat image "Logo for a coffee shop" -o logo.png
+cli-web-chatgpt chat image "A cute cat wearing a hat" --json
+cli-web-chatgpt chat image "Logo for a coffee shop" -o logo.png --json
 ```
-Options: `--style <name>`, `--output/-o <path>`, `--conversation <id>`
+Options: `--style <name>`, `--output/-o <path>`, `--conversation <id>`, `--json`
 Output: `{"success": true, "data": {"file_id": "...", "download_url": "...", "conversation_id": "...", "saved_to": "..."}}`
 
 ### conversations list
 List recent conversations.
 ```bash
-cli-web-chatgpt --json conversations list --limit 20
-cli-web-chatgpt --json conversations list --archived
-cli-web-chatgpt --json conversations list --starred
+cli-web-chatgpt conversations list --limit 20 --json
+cli-web-chatgpt conversations list --archived --json
+cli-web-chatgpt conversations list --starred --json
 ```
-Options: `--limit/-n <N>`, `--archived`, `--starred`
+Options: `--limit/-n <N>`, `--archived`, `--starred`, `--json`
 
 ### conversations get <id>
 View a conversation's messages.
 ```bash
-cli-web-chatgpt --json conversations get 69ca710b-5ef8-8397-a242-c5123470d7f8
+cli-web-chatgpt conversations get 69ca710b-5ef8-8397-a242-c5123470d7f8 --json
 ```
 
 ### images list
 List recently generated images.
 ```bash
-cli-web-chatgpt --json images list --limit 10
+cli-web-chatgpt images list --limit 10 --json
 ```
 
 ### images download <file_id>
 Download a generated image.
 ```bash
-cli-web-chatgpt --json images download file_00000000xxx -c <conversation_id> -o image.png
+cli-web-chatgpt images download file_00000000xxx -c <conversation_id> -o image.png --json
 ```
-Options: `--conversation/-c <id>` (required), `--output/-o <path>`
+Options: `--conversation/-c <id>` (required), `--output/-o <path>`, `--json`
 
 ### images styles
 List available image styles.
 ```bash
-cli-web-chatgpt --json images styles
+cli-web-chatgpt images styles --json
 ```
 
 ### models
 List available ChatGPT models.
 ```bash
-cli-web-chatgpt --json models
+cli-web-chatgpt models --json
 ```
 
 ### me
 Show current user profile.
 ```bash
-cli-web-chatgpt --json me
+cli-web-chatgpt me --json
 ```
 
 ### auth login / status / logout

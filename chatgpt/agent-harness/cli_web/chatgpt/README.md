@@ -27,7 +27,7 @@ npx @playwright/cli@latest -s=chatgpt close
 
 Check auth status:
 ```bash
-cli-web-chatgpt --json auth status
+cli-web-chatgpt auth status --json
 ```
 
 ## Usage
@@ -36,21 +36,21 @@ cli-web-chatgpt --json auth status
 ```bash
 cli-web-chatgpt chat ask "What is the capital of France?"
 cli-web-chatgpt chat ask "Explain quantum computing" --model gpt-5-3
-cli-web-chatgpt --json chat ask "What is 2+2?"
+cli-web-chatgpt chat ask "What is 2+2?" --json
 ```
 
 ### Generate an image
 ```bash
 cli-web-chatgpt chat image "A cat wearing a hat"
 cli-web-chatgpt chat image "Sunset over mountains" -o sunset.png
-cli-web-chatgpt --json chat image "Abstract art"
+cli-web-chatgpt chat image "Abstract art" --json
 ```
 
 ### List conversations
 ```bash
 cli-web-chatgpt conversations list
 cli-web-chatgpt conversations list --limit 5
-cli-web-chatgpt --json conversations list --archived
+cli-web-chatgpt conversations list --archived --json
 ```
 
 ### Browse generated images
