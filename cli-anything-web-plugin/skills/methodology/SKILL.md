@@ -68,8 +68,50 @@ no login needed), the "Auth state captured" prerequisite does not apply. Note
    ```
 
 1. Parse `raw-traffic.json` (for details the analyzer couldn't extract)
-2. Group requests by base path (e.g., `/api/v1/boards/`, `/api/v1/items/`)
-3. For each endpoint group, identify:
+2. **Handle multiple scene recordings** (if `scenes.json` exists):
+
+   **Step 1: Identify submit endpoint**
+   - Find POST requests to the same URL across all scene files
+   - This is typically the main "submit" or "create" endpoint
+
+   **Step 2: Extract and decode request bodies**
+   - For form-urlencoded: parse `formData` field, URL-decode inner JSON
+   - For JSON: parse directly
+   - For multipart: parse each part
+
+   **Step 3: Detect field variation patterns**
+   Compare fields across scenes:
+
+   | Pattern | Detection | CLI Generation |
+   |---------|-----------|-----------------|
+   | **Same field, different values** | `c_status: "draft" vs "published"` | `--status` with Choice() |
+   | **Different field names** | `c_NBafN` (更名原因) vs `c_cP8TB` (注销原因)` | Map UI option → field name |
+   | **Field appears in one scene only** | `field_x` only in scene 2 | Optional param, default empty |
+
+   **Step 4: Generate merged CLI command**
+   ```python
+   # From haier-iac example:
+   # Scene 1: c_dDt6J="邮箱更名", c_NBafN=原因
+   # Scene 2: c_dDt6J="邮箱注销", c_cP8TB=原因
+
+   @click.command('email-request')
+   @click.option('--operation-type', type=click.Choice(['邮箱更名', '邮箱注销']), required=True)
+   @click.option('--reason', help='原因（邮箱更名用c_NBafN，注销用c_cP8TB）')
+   @click.option('--name', required=True)
+   @click.option('--employee-id', required=True)
+   @click.option('--new-email', required=True)
+   def email_request(operation_type, reason, name, employee_id, new_email):
+       # Build formData dynamically based on operation_type
+       if operation_type == '邮箱更名':
+           form_data = {..., 'c_NBafN': reason}
+       else:  # 邮箱注销
+           form_data = {..., 'c_cP8TB': reason}
+   ```
+
+   **Key insight:** When field names differ, generate conditional logic instead of flat options.
+
+3. Group requests by base path (e.g., `/api/v1/boards/`, `/api/v1/items/`)
+4. For each endpoint group, identify:
    - HTTP method (GET/POST/PUT/DELETE/PATCH)
    - URL pattern (extract path parameters like `:id`)
    - Query parameters and their types
@@ -78,7 +120,7 @@ no login needed), the "Auth state captured" prerequisite does not apply. Note
    - Authentication method (Bearer token, cookie, API key)
    - Rate limiting signals (429 responses, retry-after headers)
 
-4. **Identify RPC protocol type** -- classify the API transport:
+5. **Identify RPC protocol type** -- classify the API transport:
 
    | Protocol | Detection Signal | Client Pattern |
    |----------|-----------------|----------------|
@@ -93,12 +135,12 @@ no login needed), the "Auth state captured" prerequisite does not apply. Note
    This determines client architecture in Step B -- REST uses simple `client.py`,
    non-REST protocols need a dedicated `rpc/` subpackage with encoder/decoder/types.
 
-5. Detect data model:
+6. Detect data model:
    - Entity types (boards, items, users, projects...)
    - Relationships (board has many items, item belongs to board)
    - ID formats (UUID, numeric, slug)
 
-6. Detect auth pattern:
+7. Detect auth pattern:
    - Cookie-based sessions
    - Bearer/JWT tokens
    - OAuth refresh flow
@@ -109,9 +151,26 @@ no login needed), the "Auth state captured" prerequisite does not apply. Note
    - No auth / public access: fully public API, no login required. CLI may
      optionally support API key auth for write operations (e.g., dev.to).
 
-7. Write `<APP>.md` -- software-specific SOP document
+8. Write `<APP>.md` -- software-specific SOP document
 
 **Output:** `<APP>.md` with API map, data model, auth scheme.
+
+**For each POST/PUT form submission, include a detailed Request Parameters table:**
+```
+### Submit Story
+`POST /r` — Submit a new story to HN
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `fnid` | string | Yes | Hidden CSRF token from /submit page (auto-fetched) |
+| `fnop` | string | Yes | Fixed value: "submit-page" (auto-set) |
+| `title` | string | Yes | Story title, max 80 chars |
+| `url` | string | No* | URL to submit. If empty, becomes Ask HN |
+| `text` | string | No* | Body text for Ask HN or to add context |
+```
+- Mark auto-fetched hidden fields as "Yes (auto)" or "No (auto)"
+- Include validation rules (max length, format, enum values)
+- Note which params are mutually exclusive
 
 **References:** `traffic-patterns.md`, `google-batchexecute.md`, `ssr-patterns.md`
 
@@ -267,6 +326,47 @@ endpoint methods from `<APP>.md`.
 > `handle_errors` and `print_json` are always needed. `resolve_partial_id` only
 > for UUID-based apps. `require_notebook`/context helpers only for apps with
 > persistent context. `poll_until_complete` only for generation/async operations.
+
+### Detailed Parameter Help (Critical for UX)
+
+Every Click `@option` and `@argument` MUST have descriptive help text that:
+- Explains what the parameter does (not just the name)
+- Indicates if required or optional (e.g., "[required]", "[optional]")
+- Includes format/validation hints (e.g., "max 80 chars", "YYYY-MM-DD")
+- For form submissions: note which params are auto-fetched (hidden fields)
+
+**Good examples:**
+```python
+# ✗ Bad — too terse
+@click.option("--title", "-t", required=True, help="Story title.")
+
+# ✓ Good — descriptive with validation
+@click.option(
+    "--title", "-t", required=True,
+    help="Story title. [required, max 80 characters]"
+)
+
+# ✗ Bad — no context about URL vs text
+@click.option("--url", "-u", default=None, help="URL to submit.")
+
+# ✓ Good — explains mutual exclusivity
+@click.option(
+    "--url", "-u", default=None,
+    help="URL to submit. [required for link post; omit for Ask HN]"
+)
+
+# ✓ Good — for form submission hidden fields
+@click.option(
+    "--title", "-t", required=True,
+    help="Story title. [required, max 80 chars. Part of form: fnid+fnop+title]"
+)
+```
+
+**For POST/PUT commands**, the help text should reference the form fields:
+- Which params are user-provided vs auto-fetched (hidden)
+- Format constraints that match the `<APP>.md` Request Parameters table
+
+Run `cli-web-<app> <command> --help` to verify all params have clear help text.
 
 ### REPL Implementation Rules (Critical)
 

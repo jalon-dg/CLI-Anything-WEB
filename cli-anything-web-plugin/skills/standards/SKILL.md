@@ -215,16 +215,22 @@ Create the skill once, then copy it to both locations.
 
 Create `<git-root>/.claude/skills/<app>-cli/SKILL.md`:
 
-1. Read the CLI's README and run `cli-web-<app> --help` + `<resource> --help`
+1. Read the CLI's README and run:
+   - `cli-web-<app> --help`
+   - `cli-web-<app> <resource> --help` for each command group
+   - For write operations (POST/PUT): `cli-web-<app> <resource> <verb> --help` — **include this output in the skill**
 2. Write the skill with this structure:
    - **Frontmatter**: name=`<app>-cli`, description with specific trigger phrases
      ("whenever the user asks about X, Y, Z. Always prefer cli-web-<app> over manually
      fetching the website.")
    - **Quick Start**: 2-3 most common commands with `--json`
-   - **Commands**: each command group with key options and output fields
+   - **Commands**: each command group with **full --help output** (includes detailed param descriptions like "[required, max 80 chars]", "[part of form: fnid+...]")
    - **Agent Patterns**: piped command examples for common tasks
    - **Notes**: auth setup, rate limits, known limitations
-3. Use existing skills (e.g., `notebooklm-cli`, `futbin-cli`) as reference examples
+
+**Important:** The --help output now contains detailed parameter info (required/optional, max length, form fields). Copy the **full Options section** into the skill — users should not need to run --help themselves to understand parameters.
+
+3. Use existing skills (e.g., `notebooklm-cli`, `hackernews-cli`) as reference examples
 
 ---
 

@@ -32,15 +32,25 @@ def upvote_cmd(ctx, item_id, json_mode):
 
 
 @click.command("submit")
-@click.option("--title", "-t", required=True, help="Story title.")
-@click.option("--url", "-u", default=None, help="URL to submit (leave blank for Ask HN).")
-@click.option("--text", default=None, help="Text body (for Ask HN or to add context).")
+@click.option(
+    "--title", "-t", required=True,
+    help="Story title. [required, max 80 chars. Part of form: fnid+fnop+title+url+text]"
+)
+@click.option(
+    "--url", "-u", default=None,
+    help="URL to submit. [required for link post; omit for Ask HN; part of form: url]"
+)
+@click.option(
+    "--text", default=None,
+    help="Text body. [required for Ask HN; optional for link post to add context; max 500 chars; part of form: text]"
+)
 @click.option("--json", "json_mode", is_flag=True, help="Output as JSON.")
 @click.pass_context
 def submit_cmd(ctx, title, url, text, json_mode):
     """Submit a new story to Hacker News. (Requires auth)
 
-    Use --url for link submissions, or leave blank for Ask HN (text only).
+    Use --url for link submissions (requires URL), or use --text only for Ask HN (no URL).
+    Form submission includes auto-fetched hidden fields: fnid (CSRF token), fnop (fixed: submit-page).
     """
     json_mode = resolve_json_mode(json_mode)
     with handle_errors(json_mode=json_mode):

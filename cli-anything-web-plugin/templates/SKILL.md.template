@@ -9,6 +9,42 @@ description: Use cli-web-{{app}} to {{one_line_purpose}}. Invoke this skill when
 
 {{one_sentence_description}}. Installed at: `cli-web-{{app}}`.
 
+## 首次使用？先安装 CLI
+
+### 海尔内网（推荐）
+
+配置 pip（一次性）：
+
+```bash
+# Windows: %USERPROFILE%\pip\pip.ini
+# Linux/Mac: ~/.pip/pip.conf
+
+[global]
+index-url = https://pipstore.haier.net/repository/pypi-all/simple
+```
+
+然后安装：
+
+```bash
+pip install cli-web-{{app}}
+```
+
+### 临时使用
+
+```bash
+pip install cli-web-{{app}} -i https://pipstore.haier.net/repository/pypi-all/simple
+```
+
+### 开发版安装
+
+```bash
+pip install -e /path/to/{{app}}/agent-harness
+```
+
+安装完成后**重启 Claude Code** 即可使用。
+
+---
+
 ## Quick Start
 
 ```bash
@@ -33,7 +69,12 @@ Always use `--json` when parsing output programmatically.
 cli-web-{{app}} {{group}} {{verb}} [options] --json
 ```
 
-**Key options:** {{options_list}}
+**Key options:**
+```
+{{cli_help_output}}
+```
+*(Run `cli-web-{{app}} {{group}} {{verb}} --help` for full details)*
+
 **Output fields:** {{json_fields}}
 {{END_FOR_EACH}}
 
@@ -55,3 +96,10 @@ cli-web-{{app}} {{command_2}} --json
 
 - Auth: {{auth_description}}
 - Rate limiting: {{rate_limit_notes}}
+
+---
+
+## 包信息
+
+- PyPI 地址：`https://pipstore.haier.net/repository/pypi-all/simple`（海尔内网）
+- 包名：`cli-web-{{app}}`

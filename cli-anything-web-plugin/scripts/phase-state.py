@@ -145,6 +145,23 @@ def cmd_check(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def cmd_set(args: argparse.Namespace) -> None:
+    """Set an arbitrary key-value pair in the state."""
+    state = _load(args.app_dir)
+    if "metadata" not in state:
+        state["metadata"] = {}
+    state["metadata"][args.key] = args.value
+    _save(args.app_dir, state)
+    print(f"Set {args.key}={args.value}")
+
+
+def cmd_get(args: argparse.Namespace) -> None:
+    """Get a value from the state metadata."""
+    state = _load(args.app_dir)
+    value = state.get("metadata", {}).get(args.key, "")
+    print(value)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Pipeline phase state manager")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -182,6 +199,19 @@ def main() -> None:
     p_check.add_argument("--phase", required=True, choices=PHASES)
     p_check.add_argument("--force", action="store_true", help="Force re-run even if done")
     p_check.set_defaults(func=cmd_check)
+
+    # set
+    p_set = sub.add_parser("set", help="Set a metadata key-value pair")
+    p_set.add_argument("app_dir", help="App directory")
+    p_set.add_argument("--key", required=True, help="Key to set")
+    p_set.add_argument("--value", required=True, help="Value to set")
+    p_set.set_defaults(func=cmd_set)
+
+    # get
+    p_get = sub.add_parser("get", help="Get a metadata value by key")
+    p_get.add_argument("app_dir", help="App directory")
+    p_get.add_argument("--key", required=True, help="Key to get")
+    p_get.set_defaults(func=cmd_get)
 
     args = parser.parse_args()
     args.func(args)

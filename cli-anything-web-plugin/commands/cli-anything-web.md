@@ -12,6 +12,33 @@ Read the methodology overview:
 
 Target URL and flags: $ARGUMENTS
 
+## Scope Confirmation (IMPORTANT)
+
+Extract the app name from the URL (e.g., `https://iac.haier.net/Initiate?id=...` → domain: `haier.net`).
+
+**Before starting capture, ask the user to confirm scope:**
+
+```
+我检测到你要为以下网站生成 CLI：
+- URL: <url>
+- 应用名: <app>
+
+这个 URL 是一个特定页面还是整个网站？
+- [1] 整个网站 (默认) - 探索所有功能，生成完整 CLI
+- [2] 特定页面/功能 - 只抓取这个页面的 API
+- [3] 取消
+```
+
+根据用户选择设置抓取范围：
+- **选项 1 (整个网站)**: 执行标准全站抓取流程
+- **选项 2 (特定页面)**: 只抓取当前 URL 的 API，然后停止抓取，生成的 CLI 会标记为"简化版"
+- **选项 3**: 礼貌退出
+
+**保存用户选择到 phase state:**
+```bash
+python ${CLAUDE_PLUGIN_ROOT}/scripts/phase-state.py update <app> --phase capture --data "scope=<full|partial>"
+```
+
 ## Capture Mode Detection
 
 Check if `--mitmproxy` flag is present in the arguments:
@@ -49,12 +76,20 @@ prior completion and skips if already done.**
    python ${CLAUDE_PLUGIN_ROOT}/scripts/phase-state.py check <app> --phase <phase>
    # Exit 0 = skip (already done), Exit 1 = run
    ```
-4. Invoke `capture` skill -- Phase 1 site assessment + traffic recording
+4. **Check scope from phase-state:**
+   ```bash
+   python ${CLAUDE_PLUGIN_ROOT}/scripts/phase-state.py get <app> --key scope
+   ```
+   - If `scope=partial`: 告诉 capture skill 只抓取当前页面，不探索其他页面
+   - If `scope=full` 或未设置: 执行标准全站抓取
+5. Invoke `capture` skill -- Phase 1 site assessment + traffic recording
    - Also check capture checkpoint: `python ${CLAUDE_PLUGIN_ROOT}/scripts/capture-checkpoint.py restore <app>`
-5. Invoke `methodology` skill -- Phase 2 analyze/design/implement
+   - **重要**: 如果 `scope=partial`，只抓取用户提供的 URL，不进行站点探索
+6. Invoke `methodology` skill -- Phase 2 analyze/design/implement
    - Agent MUST read a reference CLI first (same protocol) — see methodology skill
-6. Invoke `testing` skill -- Phase 3 test writing/documentation
-7. Invoke `standards` skill -- Phase 4 publish and verify + generate Claude skill
+   - **重要**: 如果 `scope=partial`，在 APP.md 中标记为"简化版 CLI"并只实现当前页面的功能
+7. Invoke `testing` skill -- Phase 3 test writing/documentation
+8. Invoke `standards` skill -- Phase 4 publish and verify + generate Claude skill
 
 After each phase completes, mark it:
 ```bash

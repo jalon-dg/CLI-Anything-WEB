@@ -57,6 +57,27 @@ HN uses a `user` cookie for auth (format: `username&hash`).
 | GET | `/submitted?id=USERNAME` | View user's submissions (HTML) |
 | GET | `/threads?id=USERNAME` | View comment replies/threads (HTML) |
 
+#### Submit Story — `POST /r`
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `fnid` | string | Yes (auto) | Hidden CSRF token from `/submit` page. Auto-fetched at runtime. |
+| `fnop` | string | Yes (auto) | Fixed value: `submit-page`. Auto-set. |
+| `title` | string | Yes | Story title. Max 80 characters. |
+| `url` | string | No* | URL to submit. **Required for link post**; omit for Ask HN. |
+| `text` | string | No* | Body text for Ask HN or to add context to link post. Max 500 chars. |
+
+*Note: Either `url` OR `text` must be provided. Link posts use `url` only. Ask HN uses `text` only.
+
+#### Post Comment — `POST /comment`
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `parent` | string | Yes | Parent item ID (story or comment to reply to). |
+| `hmac` | string | Yes (auto) | Hidden auth token from item page. Auto-fetched at runtime. |
+| `goto` | string | Yes (auto) | Navigation target: `item?id={parent}`. Auto-set. |
+| `text` | string | Yes | Comment body. Max 500 characters. |
+
 ## Data Models
 
 ### Story

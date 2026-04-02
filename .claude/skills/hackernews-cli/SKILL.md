@@ -47,9 +47,21 @@ cli-web-hackernews auth logout                     # Remove credentials
 
 # Actions
 cli-web-hackernews upvote 47530330 --json          # Upvote story/comment
+
+# Submit story (link post or Ask HN)
 cli-web-hackernews submit -t "Title" -u "URL" --json  # Submit link
 cli-web-hackernews submit -t "Ask HN: Q?" --text "Details" --json  # Ask HN
+# Full options:
+#   -t, --title TEXT  Story title. [required, max 80 chars. Part of form: fnid+fnop+title+url+text]
+#   -u, --url TEXT    URL to submit. [required for link post; omit for Ask HN; part of form: url]
+#   --text TEXT       Text body. [required for Ask HN; optional for link post to add context; max 500 chars]
+
 cli-web-hackernews comment 47530330 "Great!" --json    # Post comment
+# Full options:
+#   ITEM_ID (argument)     Story or comment ID to reply to
+#   TEXT (argument)         Comment body
+#   --json                  Output as JSON
+
 cli-web-hackernews favorite 47530330 --json        # Save to favorites
 cli-web-hackernews hide 47530330 --json            # Hide from feed
 

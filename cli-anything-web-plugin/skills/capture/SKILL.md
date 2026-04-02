@@ -196,7 +196,7 @@ npx @playwright/cli@latest -s=<app> state-save <app>/traffic-capture/<app>-auth.
 
 **If NO auth is needed:** Skip directly to Step 2b.
 
-### 2b. Classify Site Profile
+### 2b. Classify Site Profile + Check Scope
 
 Based on fingerprint results AND what you see in the UI, classify the site:
 
@@ -207,6 +207,18 @@ Based on fingerprint results AND what you see in the UI, classify the site:
 | **Auth + Read-only** | Yes | Read, Search, Export | Read operations + auth flow |
 | **No-auth + CRUD** | No/Optional | Full CRUD | Skip auth, full CRUD |
 | **No-auth + Read-only** | No | Read, Search | Minimal capture |
+
+**Check scope (set by cli-anything-web command):**
+```bash
+python ${CLAUDE_PLUGIN_ROOT}/scripts/phase-state.py get <app> --key scope
+```
+
+- **`scope=partial`**: 这是"特定页面"模式
+  - **不要进行站点探索** (跳过 Step 2c Quick API Probe)
+  - 直接在当前 URL 页面进行 Step 3 抓取
+  - 只捕获页面加载时的 API 请求和用户的简单交互
+  - 在 assessment.md 中标记: `scope: partial (single page)`
+- **`scope=full` 或未设置**: 执行标准全站抓取流程
 
 ### 2c. Quick API Probe (Force SPA Navigation Trick)
 
@@ -241,15 +253,42 @@ Create `<app>/traffic-capture/assessment.md` to consolidate all findings:
 - **Auth required**: <yes (type: Google SSO / cookie / JWT / API key) / no>
 - **Iframes**: <yes (N frames, app in frame N at <url>) / no>
 - **Site profile**: <Auth+CRUD / Auth+Generation / Auth+Read-only / No-auth+CRUD / No-auth+Read-only>
+- **Capture scope**: <full (entire site) / partial (single page)>
 - **Capture strategy**: <API-first / SSR+API hybrid / batchexecute / HTML scraping / protected-manual>
 - **Key observations**: <any quirks, localized UI, rate limits, special patterns>
 ```
+
+> **Note for partial scope**: If `scope=partial`, only capture what's needed for the single URL. The generated CLI will be a "simplified" version with only the captured functionality.
 
 ---
 
 ## Step 3: Full Traffic Capture
 
-Now do the comprehensive capture based on what Step 2 revealed.
+> **Tip: For complex forms with multiple options/fields, record each scenario separately.**
+> For example, if you're capturing a "create order" form:
+> - Recording 1: Create order with status=draft
+> - Recording 2: Create order with status=published
+> - Recording 3: Create order with priority=high
+>
+> Each recording will be merged into a single CLI command with `--option` flags in Phase 2.
+
+**Important: Check scope first:**
+```bash
+SCOPE=$(python ${CLAUDE_PLUGIN_ROOT}/scripts/phase-state.py get <app> --key scope 2>/dev/null || echo "full")
+```
+
+Now do the capture based on scope:
+
+- **`scope=partial` (Specific Page Mode):**
+  - Skip the profile-specific exploration checklist below
+  - Just capture the initial page load + any immediately visible API calls
+  - Take 1-2 simple interactions (e.g., click a button, fill a small form) if needed
+  - **Do NOT navigate to other pages or explore the site**
+  - Go directly to Step 4 (Stop, Save, Parse)
+  - This is intentionally lightweight — just enough for the single URL
+
+- **`scope=full` (Full Site Mode):**
+  - Proceed with the full exploration below
 
 ```bash
 # Optional: Start HAR recording alongside trace for standard-format capture
@@ -396,6 +435,46 @@ python ${CLAUDE_PLUGIN_ROOT}/scripts/analyze-traffic.py \
 
 ---
 
+## Step 4b: Continue Recording (Multiple Scenes)
+
+After parsing, ask the user if they want to record more scenes:
+
+```
+# Prompt the user: "继续录制其他场景吗？(y/n)"
+# If yes: go back to Step 3 (start new trace)
+# If no: proceed to Step 5 (close)
+
+# IMPORTANT: If continuing, save the scene name for this recording first
+python -c "
+import json
+from pathlib import Path
+
+scenes_file = Path('<app>/traffic-capture/scenes.json')
+scenes = json.loads(scenes_file.read_text()) if scenes_file.exists() else []
+
+# Ask user for scene name
+scene_name = input('这次录制是什么场景？直接回车用默认名: ').strip()
+if not scene_name:
+    scene_name = f'scene-{len(scenes) + 1}'
+
+scenes.append({
+    'name': scene_name,
+    'trace_id': '<trace-id-from-step3>',
+    'description': '用户输入的描述或空'
+})
+scenes_file.write_text(json.dumps(scenes, indent=2, ensure_ascii=False))
+print(f'Scene saved: {scene_name}')
+"
+```
+
+**Repeat this loop** until the user says no more recordings.
+
+> **Note:** If the user provides a scene name, it will be used to generate
+> CLI command names in Phase 2. For example, "create-draft-order" becomes
+> `cli-web-<app> order create-draft` command.
+
+---
+
 ## Step 5: Close
 
 ```bash
@@ -411,6 +490,10 @@ python ${CLAUDE_PLUGIN_ROOT}/scripts/capture-checkpoint.py update <app> --step c
 
 Don't grep JS bundles. Start a new trace → screenshot → click the button → fill
 → submit → stop → parse. The browser IS the API documentation.
+
+**For forms with multiple options:** If the same endpoint behaves differently based on
+form options (e.g., "create order" with different statuses), record each variation
+as a separate scene in Step 4b. This helps Phase 2 generate proper `--option` flags.
 
 ---
 

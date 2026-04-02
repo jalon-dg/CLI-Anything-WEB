@@ -51,11 +51,13 @@ cd ~/.claude/plugins
 git clone https://github.com/yourusername/cli-anything-web-plugin.git cli-anything-web
 ```
 
-## Publishing Generated CLIs to PyPI
+---
 
-After generating a CLI with `/cli-anything-web <url>`, make it installable:
+# Publishing Generated CLIs
 
-### Package structure (PEP 420 namespace)
+After generating a CLI with `/cli-anything-web <url>`, you can publish it for others to use.
+
+## Package structure (PEP 420 namespace)
 
 ```
 <app>/agent-harness/
@@ -86,7 +88,7 @@ setup(
             "cli-web-<app>=cli_web.<app>.<app>_cli:main",
         ],
     },
-    python_requires=">=3.10",
+    python_requires="">=3.10",
 )
 ```
 
@@ -105,7 +107,11 @@ cli-web-<app> --help
 CLI_WEB_FORCE_INSTALLED=1 python3 -m pytest cli_web/<app>/tests/ -v -s
 ```
 
-### Publish to PyPI
+---
+
+## Publishing to PyPI
+
+### Standard PyPI
 
 ```bash
 pip install build twine
@@ -115,13 +121,175 @@ twine upload dist/*
 
 Users install with:
 ```bash
-pip install cli-web-monday cli-web-notion
-cli-web-monday --help
-cli-web-notion --help
+pip install cli-web-<app>
+cli-web-<app> --help
 ```
 
-Multiple `cli-web-*` packages coexist in the same Python environment without
-conflicts — the `cli_web/` namespace package ensures isolation.
+### 海尔内网 PyPI 私服
+
+如果需要发布到海尔内部 PyPI 私服：
+
+#### 1. 配置 pip（用户需要先配置）
+
+编辑 `~/.pip/pip.conf`（Linux/Mac）或 `%USERPROFILE%\pip\pip.ini`（Windows）：
+
+```ini
+[global]
+index-url = https://pipstore.haier.net/repository/pypi-all/simple
+```
+
+#### 2. 发布包
+
+```bash
+# 构建包
+pip install build
+python -m build
+
+# 上传到海尔 PyPI（每次可能使用不同的 S 码）
+twine upload --repository-url https://pipstore.haier.net/repository/<S码>/ -u <S码用户名> -p <S码密码> dist/*
+```
+
+**注意**：
+- `<S码>` 由管理员分配，每个开发者可能不同
+- 上传前需要联系管理员获取 S 码账号
+- 如果遇到 401 错误，检查用户名和密码是否正确
+
+#### 3. 用户安装
+
+```bash
+# 方法一：配置 pip.conf（推荐，一劳永逸）
+pip install cli-web-<app>
+
+# 方法二：临时指定源
+pip install cli-web-<app> -i https://pipstore.haier.net/repository/pypi-all/simple
+```
+
+---
+
+## 生成并分发 Skill
+
+生成 CLI 后，还需要创建 skill 方便用户在 Claude Code 中使用。
+
+### 1. 创建 skill 目录结构
+
+```
+项目目录/.claude/skills/<app>-cli/
+└── SKILL.md
+```
+
+### 2. SKILL.md 模板
+
+```markdown
+---
+name: {{app}}-cli
+description: Use cli-web-{{app}} to {{one_line_purpose}}. Invoke this skill whenever
+  the user asks about {{trigger_topics}}. Always prefer cli-web-{{app}} over manually
+  fetching the website.
+---
+
+# cli-web-{{app}}
+
+{{one_sentence_description}}. Installed at: `cli-web-{{app}}`.
+
+## 首次使用？先安装 CLI
+
+### 海尔内网（推荐）
+
+```bash
+# 配置 pip（如未配置）
+# Windows: %USERPROFILE%\pip\pip.ini
+# Linux/Mac: ~/.pip/pip.conf
+[global]
+index-url = https://pipstore.haier.net/repository/pypi-all/simple
+
+# 安装 CLI
+pip install cli-web-{{app}}
+```
+
+或开发版安装：
+
+```bash
+pip install -e /path/to/{{app}}/agent-harness
+```
+
+安装完成后重启 Claude Code 即可使用。
+
+---
+
+## Quick Start
+
+```bash
+# {{most_common_operation_description}}
+cli-web-{{app}} {{primary_command}} --json
+
+# {{second_operation_description}}
+cli-web-{{app}} {{secondary_command}} --json
+```
+
+Always use `--json` when parsing output programmatically.
+
+---
+
+## Commands
+
+{{FOR_EACH_COMMAND_GROUP}}
+### `{{group}} {{verb}}`
+{{command_description}}
+
+```bash
+cli-web-{{app}} {{group}} {{verb}} [options] --json
+```
+
+**Key options:** {{options_list}}
+**Output fields:** {{json_fields}}
+{{END_FOR_EACH}}
+
+---
+
+## Notes
+
+- Auth: {{auth_description}}
+- Rate limiting: {{rate_limit_notes}}
+```
+
+### 3. 分发给用户
+
+用户需要做两件事：
+
+1. **复制 skill 文件**到 `~/.claude/skills/<app>-cli/SKILL.md`
+2. **安装 CLI**：`pip install cli-web-<app>`
+
+---
+
+## 完整发布流程
+
+1. **生成 CLI**：使用 `/cli-anything-web <url>` 生成 CLI 代码
+
+2. **本地测试**：
+   ```bash
+   cd <app>/agent-harness
+   pip install -e .
+   cli-web-<app> --help
+   ```
+
+3. **构建包**：
+   ```bash
+   python -m build
+   ```
+
+4. **发布 CLI**（二选一）：
+   - 标准 PyPI：`twine upload dist/*`
+   - 海尔私服：`twine upload --repository-url https://pipstore.haier.net/repository/<S码>/ ...`
+
+5. **创建 skill**：
+   - 在项目目录创建 `.claude/skills/<app>-cli/SKILL.md`
+   - 填充模板内容，添加安装说明
+
+6. **分发**：
+   - 提供 skill 文件给用户
+   - 提供安装命令：`pip install cli-web-<app>`
+
+---
 
 ## Versioning
 
@@ -144,3 +312,4 @@ Before publishing:
 - [ ] Tests pass (unit + E2E)
 - [ ] `cli-web-<app> --help` shows all commands
 - [ ] `cli-web-<app> --json <cmd>` works
+- [ ] SKILL.md created with installation instructions
