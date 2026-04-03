@@ -25,7 +25,7 @@ be supplied by the calling skill.
 | `AppName` | str | PascalCase of app_name | `HackerNews` |
 | `protocol` | enum | Traffic analysis: `rest`, `graphql`, `html-scraping`, `batchexecute` | `rest` |
 | `http_client` | enum | Traffic analysis: `httpx`, `curl_cffi` | `httpx` |
-| `auth_type` | enum | Site profile: `none`, `cookie`, `api-key`, `google-sso` | `cookie` |
+| `auth_type` | enum | Site profile: `none`, `cookie`, `api-key`, `token`, `google-sso` | `cookie` |
 | `resources` | list[str] | From `<APP>.md` endpoint groups | `["stories", "users", "search"]` |
 | `has_polling` | bool | Any async/long-running operations? | `false` |
 | `has_context` | bool | Does the CLI need `use <id>` / `status` context? | `false` |
@@ -249,6 +249,206 @@ markers (AUTH_FILE, AUTH_ENV_VAR, and get_auth_path).
 
 **If `has_context == false`**: Remove the CONTEXT_FILE line.
 
+### 3.4b: `core/auth.py` (Cookie 模式)
+
+当 `auth_type = "cookie"` 时使用此模板：
+
+```python
+"""Authentication management for cli-web-{app_name} (Cookie mode)."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from .config import AUTH_DIR, get_auth_path
+from .exceptions import AuthError
+
+AUTH_JSON_FILE = AUTH_DIR / "auth.json"
+
+
+def load_cookies() -> dict:
+    """从文件或环境变量加载认证 cookie.
+
+    Returns:
+        Cookie 字典
+
+    Raises:
+        AuthError if no auth found
+    """
+    import os
+
+    # 优先从环境变量加载
+    env_auth = os.environ.get(f"CLI_WEB_{APP_NAME}_AUTH_JSON")
+    if env_auth:
+        try:
+            return json.loads(env_auth)
+        except json.JSONDecodeError:
+            pass
+
+    # 从 auth.json 文件加载
+    if AUTH_JSON_FILE.exists():
+        return json.loads(AUTH_JSON_FILE.read_text(encoding="utf-8"))
+
+    raise AuthError(
+        f"No auth found. Run: cli-web-{app_name} auth login"
+    )
+
+
+def save_cookies(cookies: dict) -> None:
+    """保存认证 cookie 到文件.
+
+    Args:
+        cookies: 要保存的 cookie 字典
+    """
+    AUTH_DIR.mkdir(parents=True, exist_ok=True)
+    AUTH_JSON_FILE.write_text(
+        json.dumps(cookies, indent=2, ensure_ascii=False),
+        encoding="utf-8"
+    )
+    try:
+        AUTH_JSON_FILE.chmod(0o600)
+    except Exception:
+        pass  # Windows 可能不支持
+
+
+def clear_auth() -> None:
+    """清除保存的认证信息."""
+    if AUTH_JSON_FILE.exists():
+        AUTH_JSON_FILE.unlink()
+
+
+def get_auth_status() -> dict:
+    """获取当前认证状态.
+
+    Returns:
+        Dict with "status" key: "valid" or "missing"
+    """
+    try:
+        cookies = load_cookies()
+        if cookies:
+            return {"status": "valid", "cookies": list(cookies.keys())}
+    except AuthError:
+        pass
+    return {"status": "missing"}
+```
+
+### 3.4c: `core/auth.py` (Token 模式)
+
+当 `auth_type = "token"` 时使用此模板：
+
+```python
+"""Authentication management for cli-web-{app_name} (Token mode)."""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from .config import AUTH_DIR, get_auth_path
+from .exceptions import AuthError
+
+TOKEN_FILE = AUTH_DIR / "token"
+TOKEN_HEADER = "Access-Token"  # 可根据实际调整
+
+
+def load_token() -> str:
+    """从文件或环境变量加载 token.
+
+    Returns:
+        Token 字符串
+
+    Raises:
+        AuthError if no token found
+    """
+    # 优先从环境变量加载
+    env_token = os.environ.get(f"CLI_WEB_{APP_NAME}_TOKEN")
+    if env_token:
+        return env_token
+
+    # 从 token 文件加载
+    if TOKEN_FILE.exists():
+        return TOKEN_FILE.read_text(encoding="utf-8").strip()
+
+    raise AuthError(
+        f"No token found. Run: cli-web-{app_name} auth login"
+    )
+
+
+def save_token(token: str) -> None:
+    """保存 token 到文件.
+
+    Args:
+        token: 要保存的 token 字符串
+    """
+    AUTH_DIR.mkdir(parents=True, exist_ok=True)
+    TOKEN_FILE.write_text(token, encoding="utf-8")
+    try:
+        TOKEN_FILE.chmod(0o600)
+    except Exception:
+        pass  # Windows 可能不支持
+
+
+def clear_auth() -> None:
+    """清除保存的认证信息."""
+    if TOKEN_FILE.exists():
+        TOKEN_FILE.unlink()
+
+
+def get_auth_status() -> dict:
+    """获取当前认证状态.
+
+    Returns:
+        Dict with "status" key: "valid" or "missing"
+    """
+    try:
+        token = load_token()
+        if token:
+            return {"status": "valid", "token": token[:10] + "..."}
+    except AuthError:
+        pass
+    return {"status": "missing"}
+
+
+# Token 模式的 login 函数（需要用 playwright 提取 localStorage）
+def login_browser(username: str, password: str, storage_key: str = "haier-user-center-access-token"):
+    """用 Playwright 登录，提取 localStorage 中的 token.
+
+    Args:
+        username: 用户名
+        password: 密码
+        storage_key: localStorage 中的 token key
+    """
+    import asyncio
+    from playwright.sync_api import sync_playwright
+
+    print(f"Opening browser for login to extract token from localStorage['{storage_key}']...")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        # 导航到登录页（需要根据实际登录 URL 调整）
+        page.goto("https://e.haier.net/login")
+
+        # 填入用户名密码并登录
+        page.fill('input[name="username"]', username)
+        page.fill('input[name="password"]', password)
+        page.click('button[type="submit"]')
+
+        # 等待登录完成
+        page.wait_for_load_state("networkidle")
+
+        # 提取 localStorage 中的 token
+        token = page.evaluate(f"localStorage.getItem('{storage_key}')")
+
+        browser.close()
+
+        if not token:
+            raise AuthError(f"Failed to extract token from localStorage['{storage_key}']")
+
+        save_token(token)
+        print(f"Login successful! Token saved.")
+```
+
 ### 3.5: `core/client.py`
 
 Generate ONE of the following variants based on `protocol` and `http_client`.
@@ -274,11 +474,17 @@ class {AppName}Client:
 
     BASE_URL = "https://FILL_IN_BASE_URL"
 
-    def __init__(self, cookies: dict | None = None, api_key: str | None = None):
+    def __init__(self, cookies: dict | None = None, api_key: str | None = None, token: str | None = None):
         self._cookies = cookies or {{}}
         self._api_key = api_key
+        self._token = token
         headers = {{"User-Agent": "cli-web-{app_name}/0.1.0"}}
-        if self._api_key:
+        # 根据 auth_type 使用不同的认证方式
+        if self._token:
+            # token 模式：使用自定义的 Token Header
+            headers["Access-Token"] = self._token
+        elif self._api_key:
+            # api-key 模式：使用 Bearer Token
             headers["Authorization"] = f"Bearer {{self._api_key}}"
         self._client = httpx.Client(
             base_url=self.BASE_URL,
@@ -349,10 +555,20 @@ class {AppName}Client:
 
     BASE_URL = "https://FILL_IN_BASE_URL"
 
-    def __init__(self, cookies: dict | None = None):
+    def __init__(self, cookies: dict | None = None, api_key: str | None = None, token: str | None = None):
         self._cookies = cookies or {{}}
+        self._api_key = api_key
+        self._token = token
         self._session = curl_requests.Session(impersonate="chrome")
-        self._session.headers.update({{"User-Agent": "cli-web-{app_name}/0.1.0"}})
+        headers = {{"User-Agent": "cli-web-{app_name}/0.1.0"}}
+        # 根据 auth_type 使用不同的认证方式
+        if self._token:
+            # token 模式：使用自定义的 Token Header
+            headers["Access-Token"] = self._token
+        elif self._api_key:
+            # api-key 模式：使用 Bearer Token
+            headers["Authorization"] = f"Bearer {{self._api_key}}"
+        self._session.headers.update(headers)
 
     def _request(
         self,
