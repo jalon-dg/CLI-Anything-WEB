@@ -83,6 +83,27 @@ sessions are interrupted.
 
 ---
 
+## 命令行参数
+
+### Auth Mode 选项
+
+**--auth-mode** (可选):
+- `auto` (默认): 自动检测认证方式
+- `cookie`: 强制使用 Cookie 模式
+- `token`: 强制使用 Token 模式
+
+使用示例：
+```bash
+/cli-anything-web:record https://example.com --auth-mode cookie
+/cli-anything-web:record https://example.com --auth-mode token
+```
+
+如果指定了 --auth-mode，则跳过自动检测，直接使用指定模式。
+
+认证检测逻辑详见 [auth-detection.md](references/auth-detection.md)
+
+---
+
 ## Step 1: Setup
 
 ```bash
@@ -251,6 +272,7 @@ Create `<app>/traffic-capture/assessment.md` to consolidate all findings:
 - **Protocol**: <REST / GraphQL / batchexecute / HTML scraping / hybrid>
 - **Protection**: <none / cloudflare / captcha / aws-waf / etc.>
 - **Auth required**: <yes (type: Google SSO / cookie / JWT / API key) / no>
+- **Auth mode**: <detected auth mode> (auto-detected | user-selected | cookie | token)
 - **Iframes**: <yes (N frames, app in frame N at <url>) / no>
 - **Site profile**: <Auth+CRUD / Auth+Generation / Auth+Read-only / No-auth+CRUD / No-auth+Read-only>
 - **Capture scope**: <full (entire site) / partial (single page)>
