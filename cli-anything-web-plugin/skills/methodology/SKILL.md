@@ -256,6 +256,44 @@ endpoint methods from `<APP>.md`.
       Use `curl_cffi` when Phase 1 detects Cloudflare (`cf-ray` header, challenge page).
       Add `curl_cffi, beautifulsoup4` to `setup.py` instead of `httpx`.
   - Centralized auth header/cookie injection
+  - **根据 auth_mode 修改认证注入方式:**
+
+    **如果 auth_mode = "cookie":**
+    使用现有的 cookie 注入方式（默认）：
+    ```python
+    # client.py 中的请求方法
+    def request(self, method: str, url: str, **kwargs):
+        # 注入 cookies
+        kwargs.setdefault("cookies", self._cookies)
+        # 或使用 httpx 的 cookie jar
+        return self._client.request(method, url, **kwargs)
+    ```
+
+    **如果 auth_mode = "token":**
+    使用 token header 注入：
+    ```python
+    # client.py 初始化时加载 token
+    def __init__(self, token: str | None = None):
+        self._token = token or load_token()
+        self._client = httpx.Client(
+            headers={
+                "User-Agent": "cli-web-<app>/0.1.0",
+                # 根据实际 API 要求选择 header 名称
+                "Access-Token": self._token,
+                # 或 "Authorization": f"Bearer {self._token}"
+            }
+        )
+
+    # client.py 中的请求方法
+    def request(self, method: str, url: str, **kwargs):
+        # 注入 token 到自定义 headers（如果需要动态更新）
+        kwargs.setdefault("headers", {})
+        kwargs["headers"].update({
+            "Access-Token": self._token
+        })
+        return self._client.request(method, url, **kwargs)
+    ```
+
   - Automatic JSON parsing with response body verification
   - **Status code → exception mapping**: 401/403→`AuthError`, 404→`NotFoundError`, 429→`RateLimitError`, 5xx→`ServerError`
   - **Auth retry**: On `AuthError(recoverable=True)`, refresh tokens and retry once
@@ -276,6 +314,154 @@ endpoint methods from `<APP>.md`.
 
   See `references/auth-strategies.md` for all patterns (browser login, cookie priority, API key, env var, context commands).
   Store cookies at `~/.config/cli-web-<app>/auth.json` with chmod 600.
+
+### 根据 auth_mode 生成 auth.py
+
+根据捕获阶段检测到的认证模式（`auth_mode`），生成不同的 auth.py 代码。
+
+**获取 auth_mode:** 从 `traffic-analysis.json` 或 `raw-traffic.json` 的分析结果中获取 `auth_mode` 字段，值可能为：
+- `cookie` - Cookie 认证模式
+- `token` - Token 认证模式
+- `user-selected` - 用户选择的模式
+
+**如果 auth_mode = "cookie":**
+生成 Cookie 认证代码（现有的 auth.py 模板）：
+
+```python
+# auth.py - Cookie 模式（现有模板）
+import json
+from pathlib import Path
+from ..core.config import AUTH_DIR, AUTH_FILE
+from ..core.exceptions import AuthError
+
+def load_cookies() -> list[dict]:
+    """从文件加载 cookies."""
+    if not AUTH_FILE.exists():
+        raise AuthError(
+            f"No auth found. Run: cli-web-<app> auth login"
+        )
+    with open(AUTH_FILE, encoding="utf-8") as f:
+        return json.load(f)
+
+def save_cookies(cookies: list[dict]):
+    """保存 cookies 到文件."""
+    AUTH_DIR.mkdir(parents=True, exist_ok=True)
+    with open(AUTH_FILE, "w", encoding="utf-8") as f:
+        json.dump(cookies, f, ensure_ascii=False, indent=2)
+    try:
+        AUTH_FILE.chmod(0o600)
+    except Exception:
+        pass  # Windows 可能不支持
+
+def clear_cookies():
+    """清除保存的认证信息."""
+    if AUTH_FILE.exists():
+        AUTH_FILE.unlink()
+
+def get_auth_status() -> dict:
+    """获取认证状态."""
+    try:
+        cookies = load_cookies()
+        # 检查是否有有效的 cookie
+        if cookies:
+            return {"status": "valid", "cookie_count": len(cookies)}
+    except AuthError:
+        pass
+    return {"status": "missing"}
+```
+
+**Cookie 模式的 login 命令:**
+```python
+# login 命令 - Cookie 模式
+@auth.command("login")
+@click.option("--username", "-u", required=True)
+@click.option("--password", "-p", required=True)
+def login(username, password):
+    """用 Playwright 登录，提取 cookies."""
+    # 1. 打开浏览器，导航到登录页
+    # 2. 填入用户名密码，提交表单
+    # 3. 登录成功后提取 cookies: context.cookies()
+    # 4. 保存 cookies
+    save_cookies(cookies)
+    click.secho("Login successful!", fg="green")
+```
+
+**如果 auth_mode = "token":**
+生成 Token 认证代码：
+
+```python
+# auth.py - Token 模式
+import os
+from pathlib import Path
+from ..core.config import AUTH_DIR, AUTH_FILE
+from ..core.exceptions import AuthError
+
+TOKEN_FILE = AUTH_DIR / "token"
+
+def load_token() -> str:
+    """从文件或环境变量加载 token."""
+    # 1. 先检查环境变量 (优先级更高)
+    # 获取 APP 名称（从 app_name 转换，大写加下划线）
+    # 例如: haier-iot -> HAIER_IOT
+    env_key = os.environ.get("CLI_WEB_TOKEN")
+    if env_key:
+        return env_key
+    
+    # 2. 再检查 token 文件
+    if TOKEN_FILE.exists():
+        return TOKEN_FILE.read_text().strip()
+    
+    raise AuthError(
+        f"No token found. Run: cli-web-<app> auth login"
+    )
+
+def save_token(token: str):
+    """保存 token 到文件."""
+    AUTH_DIR.mkdir(parents=True, exist_ok=True)
+    TOKEN_FILE.write_text(token, encoding="utf-8")
+    try:
+        TOKEN_FILE.chmod(0o600)
+    except Exception:
+        pass  # Windows 可能不支持
+
+def clear_token():
+    """清除保存的 token."""
+    if TOKEN_FILE.exists():
+        TOKEN_FILE.unlink()
+
+def get_auth_status() -> dict:
+    """获取认证状态."""
+    try:
+        token = load_token()
+        if token:
+            # 显示 token 前缀用于验证（不显示完整 token）
+            return {"status": "valid", "token_prefix": token[:10] + "..." if len(token) > 10 else token}
+    except AuthError:
+        pass
+    return {"status": "missing"}
+```
+
+**Token 模式的 login 命令:**
+```python
+# login 命令 - Token 模式
+@auth.command("login")
+@click.option("--username", "-u", required=True)
+@click.option("--password", "-p", required=True)
+def login(username, password):
+    """用 Playwright 登录，提取 localStorage 中的 token."""
+    # 1. 打开浏览器，导航到登录页
+    # 2. 填入用户名密码
+    # 3. 登录后提取 token: page.evaluate("localStorage.getItem('<key>')")
+    #    或从 API 响应中获取: page.evaluate("sessionStorage.getItem('<key>')")
+    # 4. 保存 token
+    save_token(token)
+    click.secho("Login successful!", fg="green")
+```
+
+**如果 auth_mode = "user-selected":**
+提示用户选择认证模式，按照用户选择生成代码。
+
+---
 
 - **Anti-bot resilient client construction** (when detected in Phase 2):
   - Extract session tokens via CDP first (cookies), then HTTP GET + HTML parsing (CSRF, session IDs)
