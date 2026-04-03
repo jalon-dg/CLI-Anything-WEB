@@ -47,6 +47,90 @@ auth status
 auth logout
 ```
 
+## LocalStorage Token
+
+### Detection:
+- Token 存储在浏览器 localStorage 中（如 `haier-user-center-access-token`）
+- API 请求通过自定义 Header 传递（如 `Access-Token`、`Authorization`）
+- 常见于：海尔内部系统、企业内部 SaaS、React/Vue SPA 应用
+
+### Detection signals in traffic:
+- Request header contains `Access-Token: <token>`
+- Request header contains `X-Auth-Token: <token>`
+- localStorage access via JavaScript: `localStorage.getItem('xxx-token')`
+
+### Implementation:
+```python
+# auth.py - Token 模式示例
+import os
+from pathlib import Path
+
+AUTH_DIR = Path.home() / ".config" / "cli-web-<app>"
+TOKEN_FILE = AUTH_DIR / "token"
+
+def load_token() -> str:
+    """从文件或环境变量加载 token."""
+    env_token = os.environ.get("CLI_WEB_<APP>_TOKEN")
+    if env_token:
+        return env_token
+    
+    if TOKEN_FILE.exists():
+        return TOKEN_FILE.read_text().strip()
+    
+    raise AuthError("No token. Run: cli-web-<app> auth login")
+
+def save_token(token: str):
+    """保存 token 到文件."""
+    AUTH_DIR.mkdir(parents=True, exist_ok=True)
+    TOKEN_FILE.write_text(token, encoding="utf-8")
+    TOKEN_FILE.chmod(0o600)
+
+# Playwright 登录并提取 localStorage token
+def login_browser(username: str, password: str, storage_key: str = "token"):
+    """用 Playwright 登录，提取 localStorage 中的 token."""
+    from playwright.sync_api import sync_playwright
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        
+        # 导航到登录页，登录
+        page.goto("https://<app>.com/login")
+        page.fill('input[name="username"]', username)
+        page.fill('input[name="password"]', password)
+        page.click('button[type="submit"]')
+        
+        # 等待登录完成
+        page.wait_for_load_state("networkidle")
+        
+        # 提取 localStorage token
+        token = page.evaluate(f"localStorage.getItem('{storage_key}')")
+        
+        if not token:
+            raise AuthError("Failed to get token from localStorage")
+        
+        save_token(token)
+        browser.close()
+```
+
+### CLI commands:
+```
+auth login --username <u> --password <p>     # 浏览器登录，提取 localStorage token
+auth login --username <u> --password <p> --storage-key <key>  # 指定 localStorage key
+auth set-token <token>                       # 手动设置 token
+auth status                                  # 检查 token 是否有效
+auth clear                                   # 清除 token
+```
+
+### Key differences from Cookie auth:
+| Aspect | Cookie | LocalStorage Token |
+|--------|--------|-------------------|
+| Storage | Browser cookies | localStorage |
+| Transport | Cookie header | Custom header (Access-Token, etc.) |
+| Persistence | Expires | Long-lived, manual refresh |
+| JavaScript access | Automatic | Must extract via page.evaluate() |
+```
+
 ## Bearer / JWT Tokens
 
 ### Detection:
