@@ -86,31 +86,79 @@ def save_token(token: str):
     TOKEN_FILE.chmod(0o600)
 
 # Playwright 登录并提取 localStorage token
-def login_browser(username: str, password: str, storage_key: str = "token"):
-    """用 Playwright 登录，提取 localStorage 中的 token."""
+def login_browser(username: str, password: str, storage_keys: list = None):
+    """用 Playwright 登录，提取 localStorage 中的 token.
+
+    关键修复点：
+    1. 优先使用用户已登录的Chrome profile
+    2. 先检查是否已有token
+    3. 登录后等待2秒再获取token（localStorage写入需要时间）
+    4. 支持多个token key优先级
+    """
+    import platform
+    from pathlib import Path
     from playwright.sync_api import sync_playwright
-    
+
+    if storage_keys is None:
+        storage_keys = ["token", "accessToken", "authorization"]
+
+    # 优先使用用户已登录的Chrome profile
+    browser_profile_dir = None
+    if platform.system() == "Windows":
+        user_chrome = str(Path.home() / "AppData/Local/Google/Chrome/User Data/Default")
+        if Path(user_chrome).exists():
+            browser_profile_dir = user_chrome
+            print("Using existing Chrome profile...")
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        
-        # 导航到登录页，登录
-        page.goto("https://<app>.com/login")
-        page.fill('input[name="username"]', username)
-        page.fill('input[name="password"]', password)
-        page.click('button[type="submit"]')
-        
-        # 等待登录完成
-        page.wait_for_load_state("networkidle")
-        
-        # 提取 localStorage token
-        token = page.evaluate(f"localStorage.getItem('{storage_key}')")
-        
+        if browser_profile_dir:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=browser_profile_dir,
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+        else:
+            context = p.chromium.launch(headless=True).new_context()
+
+        page = context.new_page()
+
+        # 导航到主站（会自动跳转到登录页）
+        page.goto("https://<app>.com")
+        page.wait_for_timeout(2000)
+
+        # 先检查是否已有token
+        token = None
+        for key in storage_keys:
+            token = page.evaluate(f"localStorage.getItem('{key}')")
+            if token:
+                print(f"Found existing token in localStorage['{key}']")
+                break
+
+        # 如果没有token，需要登录
+        if not token:
+            page.wait_for_load_state("domcontentloaded")
+            page.fill('input[name="username"]', username)
+            page.fill('input[name="password"]', password)
+            page.click('button[type="submit"]')
+
+            # 等待登录完成（跳转回主站）
+            page.wait_for_load_state("networkidle", timeout=20000)
+
+            # 关键：等待2秒确保localStorage写入完成
+            page.wait_for_timeout(2000)
+
+            # 提取token
+            for key in storage_keys:
+                token = page.evaluate(f"localStorage.getItem('{key}')")
+                if token:
+                    break
+
+        context.close()
+
         if not token:
             raise AuthError("Failed to get token from localStorage")
-        
+
         save_token(token)
-        browser.close()
 ```
 
 ### CLI commands:

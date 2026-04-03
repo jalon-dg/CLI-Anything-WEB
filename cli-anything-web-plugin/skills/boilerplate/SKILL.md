@@ -409,41 +409,89 @@ def get_auth_status() -> dict:
 
 
 # Token 模式的 login 函数（需要用 playwright 提取 localStorage）
-def login_browser(username: str, password: str, storage_key: str = "haier-user-center-access-token"):
+def login_browser(username: str, password: str, storage_keys: list = None):
     """用 Playwright 登录，提取 localStorage 中的 token.
 
     Args:
         username: 用户名
         password: 密码
-        storage_key: localStorage 中的 token key
+        storage_keys: localStorage 中的 token key 列表（按优先级排序）
     """
     import asyncio
+    import platform
+    from pathlib import Path
     from playwright.sync_api import sync_playwright
 
-    print(f"Opening browser for login to extract token from localStorage['{storage_key}']...")
+    if storage_keys is None:
+        storage_keys = [
+            "haier-user-center-access-token",
+            "aio-access-token",
+            "accessToken",
+            "token",
+        ]
+
+    # 优先使用用户已登录的Chrome profile
+    browser_profile_dir = None
+    if platform.system() == "Windows":
+        user_chrome = str(Path.home() / "AppData/Local/Google/Chrome/User Data/Default")
+        if Path(user_chrome).exists():
+            browser_profile_dir = user_chrome
+            print("Using existing Chrome profile...")
+
+    print("Opening browser for login...")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        if browser_profile_dir:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=browser_profile_dir,
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+                ignore_default_args=["--enable-automation"],
+            )
+        else:
+            context = p.chromium.launch(headless=True).new_context()
 
-        # 导航到登录页（需要根据实际登录 URL 调整）
-        page.goto("https://e.haier.net/login")
+        page = context.new_page()
 
-        # 填入用户名密码并登录
-        page.fill('input[name="username"]', username)
-        page.fill('input[name="password"]', password)
-        page.click('button[type="submit"]')
+        # 导航到e.haier.net，会自动跳转到IAM登录页
+        page.goto("https://e.haier.net")
+        page.wait_for_timeout(2000)
 
-        # 等待登录完成
-        page.wait_for_load_state("networkidle")
+        # 先检查是否已有token（可能已经登录）
+        token = None
+        for key in storage_keys:
+            token = page.evaluate(f"localStorage.getItem('{key}')")
+            if token:
+                print(f"Found existing token in localStorage['{key}']")
+                break
 
-        # 提取 localStorage 中的 token
-        token = page.evaluate(f"localStorage.getItem('{storage_key}')")
+        # 如果没有token，需要登录
+        if not token:
+            # 等待登录表单出现
+            page.wait_for_load_state("domcontentloaded")
 
-        browser.close()
+            # 填入用户名密码
+            page.fill('input[type="text"]', username)
+            page.fill('input[type="password"]', password)
+            page.click('button:has-text("登录")')
+
+            # 等待登录完成（跳转回e.haier.net）
+            page.wait_for_load_state("networkidle", timeout=20000)
+
+            # 关键：等待2秒确保localStorage写入完成
+            page.wait_for_timeout(2000)
+
+            # 提取token
+            for key in storage_keys:
+                token = page.evaluate(f"localStorage.getItem('{key}')")
+                if token:
+                    print(f"Found token in localStorage['{key}']")
+                    break
+
+        context.close()
 
         if not token:
-            raise AuthError(f"Failed to extract token from localStorage['{storage_key}']")
+            raise AuthError(f"Failed to extract token from localStorage")
 
         save_token(token)
         print(f"Login successful! Token saved.")
